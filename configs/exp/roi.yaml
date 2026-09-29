@@ -1,0 +1,20 @@
+# How much of the face the crop should show.
+#
+# Needs three datasets without masks:
+#   python scripts/build_dataset.py --out data/ab/no-ptm --no-ptm --holdout-sessions ...
+#   python scripts/build_dataset.py --out data/ab/roi-055 --no-ptm --roi-scale 0.55 --holdout-sessions ...
+#   python scripts/build_dataset.py --out data/ab/roi-080 --no-ptm --roi-scale 0.80 --holdout-sessions ...
+name: roi
+description: >
+  ROI side as a fraction of face height: 0.55 (tight, lips and chin), 0.63
+  (the area of the 96 px Auto-AVSR crop) and 0.80 (adds cheeks and jaw). All
+  are resized to 96 px, so a larger ROI shows the lips at lower resolution.
+control: mouth
+seeds: [1, 2, 3]
+metrics: [val/cer, val/wer, val/loss]
+files: [configs/exp/_local_video.yaml]
+overrides: [data.ptm_in_clips=false]
+arms:
+  mouth: [data.root=data/ab/no-ptm]
+  tight: [data.root=data/ab/roi-055]
+  lower_face: [data.root=data/ab/roi-080]

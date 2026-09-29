@@ -1,0 +1,11 @@
+# ~50M parameters: the Conformer of Ma et al. 2022 (Nature Machine Intelligence).
+# Fits a 6 GB GPU with mixed precision and small batches.
+model:
+  adim: 256
+  aheads: 4
+  eunits: 2048
+  elayers: 12
+  dunits: 2048
+  dlayers: 6
+  fusion:
+    hidden: 2048

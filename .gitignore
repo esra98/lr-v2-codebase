@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.pytest_tmp/
+
+# Reference material, kept locally
+/papers/
+/reference-codebase/
+/prompt.text
+
+# Data, weights and runs (top-level folders only: avsr/data/ is code)
+/data/
+/exp/
+/logs/
+/pretrained/
+/upload/
+*.tmp.*
+
+# Large binaries; they travel with the data (docs/deployment.md)
+/assets/*.wav
+/assets/*.task
+*.pth
+*.ckpt
+*.tar
+*.mp4

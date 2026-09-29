@@ -1,0 +1,15 @@
+# Intermediate CTC losses on the Conformer.
+name: interctc
+description: >
+  Hybrid CTC/attention baseline versus the same model with intermediate CTC
+  losses after blocks 3, 6 and 9 (Lee & Watanabe 2021), with and without
+  self-conditioning (Nozaki & Komatsu 2021).
+control: baseline
+seeds: [1, 2, 3]
+metrics: [val/cer, val/wer, val/loss]
+files: [configs/exp/_local_video.yaml]
+overrides: []
+arms:
+  baseline: []
+  interctc: ["model.interctc.layers=[3,6,9]"]
+  interctc_selfcond: ["model.interctc.layers=[3,6,9]", model.interctc.self_condition=true]

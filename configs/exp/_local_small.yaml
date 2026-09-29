@@ -1,0 +1,23 @@
+# Shared settings for A/B runs on a 6 GB GPU: the 50M-parameter model
+# trained from scratch.
+model:
+  adim: 256
+  aheads: 4
+  eunits: 2048
+  elayers: 12
+  dunits: 2048
+  dlayers: 6
+  fusion:
+    hidden: 2048
+tokenizer:
+  vocab_size: 500
+  model_path: data/tokenizer/unigram500.model
+data:
+  max_frames_per_clip: 300
+  max_frames_per_batch: 1200
+  max_batch_size: 32
+  num_workers: 6
+train:
+  max_epochs: 12
+  warmup_epochs: 2
+  save_top_k: 1

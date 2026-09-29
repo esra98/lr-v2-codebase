@@ -1,0 +1,70 @@
+# Fine-tuning the Auto-AVSR speech recognition (audio) model on TR-LRS.
+#
+# The model is the one of Auto-AVSR (Ma et al., ICASSP 2023): 3D-convolution
+# and ResNet-18 front-end, 12 Conformer blocks of width 768, 6 decoder
+# blocks. The front-end and the Conformer start from the public checkpoint
+# trained on LRS3 and VoxCeleb2 (1,759 h, 1.0 % WER on LRS3).
+# Everything except the three layers that depend on the vocabulary starts
+# from the public checkpoint: front-end, Conformer and the decoder blocks.
+# The token embedding and the two output layers start from random values,
+# because the vocabulary is Turkish.
+#
+# The pretrained parts are trained with a much lower learning rate than the
+# new layers, and are held still while the new layers take shape. With one
+# learning rate of 0.001 for everything, the model stopped using its input
+# and the character error rate stayed above 0.93 (docs/findings.md).
+#
+# Schedule and loss weights are those of the Auto-AVSR recipe.
+#
+#   python scripts/train.py -c configs/finetune/asr_base.yaml exp_name=asr_finetune
+
+model:
+  modality: audio
+  adim: 768
+  aheads: 12
+  eunits: 3072
+  elayers: 12
+  dunits: 3072
+  dlayers: 6
+  ctc_weight: 0.1
+  label_smoothing: 0.1
+  # As in Auto-AVSR. false reproduces its encoder exactly; true keeps padded
+  # frames out of the convolutions (see docs/findings.md).
+  mask_conv_padding: true
+  fusion:
+    hidden: 8192
+  pretrained:
+    path: pretrained/asr_trlrs3vox2_base.pth
+    scope: full
+  freeze: none
+
+tokenizer:
+  type: unigram
+  vocab_size: 1000
+  model_path: data/tokenizer/unigram1000.model
+
+data:
+  root: data/tr-lrs-clean-ptm
+  manifests: data/manifests
+  ptm_in_clips: true
+  max_frames_per_clip: 300
+  # 1800 frames per batch is the Auto-AVSR value. Measure what the GPU holds
+  # with scripts/benchmark_memory.py and keep (frames per batch) x
+  # (accumulate_grad_batches) near 1800.
+  max_frames_per_batch: 1800
+  max_batch_size: 64
+  num_workers: 12
+
+train:
+  max_epochs: 75
+  warmup_epochs: 5
+  # Learning rate of the new layers. The pretrained parts use
+  # lr x pretrained_lr_scale = 2e-5.
+  lr: 1.0e-3
+  pretrained_lr_scale: 0.02
+  hold_pretrained_epochs: 1
+  weight_decay: 0.03
+  grad_clip: 10.0
+  accumulate_grad_batches: 1
+  precision: 16-mixed
+  save_top_k: 10

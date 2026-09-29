@@ -1,0 +1,5 @@
+# Additionally needed to build a dataset from raw clips
+# (scripts/build_dataset.py, scripts/verify_dataset.py). Not needed for training.
+-r requirements.txt
+mediapipe>=0.10.14
+opencv-python>=4.8

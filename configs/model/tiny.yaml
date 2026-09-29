@@ -1,0 +1,10 @@
+# ~6M parameters. For unit tests and pipeline smoke tests only.
+model:
+  adim: 96
+  aheads: 4
+  eunits: 384
+  elayers: 3
+  dunits: 384
+  dlayers: 2
+  fusion:
+    hidden: 384

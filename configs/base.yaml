@@ -1,0 +1,143 @@
+# Default configuration. Experiment files under configs/exp/ override these
+# values, and command-line "key=value" arguments override both.
+
+seed: 42
+exp_dir: exp
+exp_name: default
+
+data:
+  # Dataset folder made by scripts/build_dataset.py: <session>/<clip>.mp4
+  # (96x96 mouth crop with the audio inside), .aac and .txt.
+  root: data/tr-lrs-clean-ptm
+  manifests: data/manifests
+  # Whether Partition-Time Masking is already written into the clips. It
+  # must then not be applied again during training.
+  ptm_in_clips: true
+  # Clips longer than this are left out. The longest clip of the dataset has
+  # 252 frames. Must not exceed max_frames_per_batch.
+  max_frames_per_clip: 300
+  # Upper bound on (longest clip x batch size). Lower it if the GPU runs out of memory.
+  max_frames_per_batch: 600
+  max_batch_size: 32
+  num_buckets: 50
+  num_workers: 6
+  # Copy batches to the GPU from page-locked memory. Faster, at the price of
+  # a cache in the training process that grows during the first minutes.
+  pin_memory: true
+  # Use only the first N utterances of each split (0 = all). For smoke tests.
+  limit_train: 0
+  limit_val: 0
+  limit_test: 0
+
+tokenizer:
+  type: unigram          # unigram | bpe | char
+  vocab_size: 1000
+  model_path: data/tokenizer/unigram1000.model
+
+augment:
+  video:
+    # Random (training) or centre (evaluation) crop taken from the stored
+    # frames. 0 feeds the stored frames unchanged.
+    crop_size: 88
+    flip_p: 0.5
+    time_mask:
+      enabled: true
+      max_frames: 10      # 0.4 s
+      stride_frames: 25   # one mask per second
+      fill: zero          # zero | mean
+    ptm:
+      # Masking during training. Off by default because the default
+      # dataset carries the masks in its clips.
+      enabled: false
+      grid: 4
+      alpha: 0.2
+      num_partitions: 2
+      fill: zero
+      p: 1.0
+  audio:
+    time_mask:
+      enabled: true
+      max_samples: 6400
+      stride_samples: 16000
+    noise:
+      enabled: true
+      path: ""            # empty = bundled babble noise
+      snr_levels: [-5, 0, 5, 10, 15, 20, null]   # null = clean
+  # Playback-speed range, e.g. [0.9, 1.1]. Empty list disables it.
+  speed_range: []
+
+model:
+  modality: video         # video | audio | audiovisual
+  adim: 256
+  aheads: 4
+  eunits: 2048
+  elayers: 12
+  dunits: 2048
+  dlayers: 6
+  dropout: 0.1
+  cnn_kernel: 31
+  layer_drop: 0.0
+  # Zero padded frames before each Conformer convolution. false reproduces
+  # Auto-AVSR, where a clip's encoding depends on what it is batched with.
+  mask_conv_padding: true
+  ctc_weight: 0.1
+  label_smoothing: 0.1
+  interctc:
+    layers: []            # e.g. [3, 6, 9]
+    weight: 0.3
+    self_condition: false
+  fusion:
+    type: late_mlp        # late_mlp | early_shared
+    hidden: 2048
+  pretrained:
+    path: ""
+    # frontend: visual/audio front-end only; encoder: front-end and Conformer;
+    # full: everything whose shape matches.
+    scope: encoder
+  # Parts that are not trained: none | frontend | encoder. Freezing the
+  # encoder cuts memory enough to use the 250M-parameter model on a 6 GB GPU.
+  freeze: none
+
+train:
+  max_epochs: 75
+  max_steps: -1
+  warmup_epochs: 5
+  lr: 1.0e-3
+  # Learning rate of parameters that were loaded from a pretrained
+  # checkpoint, as a fraction of lr. Parameters that start from random
+  # values always use lr.
+  pretrained_lr_scale: 1.0
+  # Number of initial epochs during which pretrained parameters are not
+  # changed at all. May be a fraction.
+  hold_pretrained_epochs: 0.0
+  weight_decay: 0.03
+  grad_clip: 10.0
+  accumulate_grad_batches: 1
+  precision: 16-mixed     # 16-mixed | bf16-mixed | 32-true
+  # Probability of training a batch on [video, audio, audiovisual] input.
+  # Only used by audiovisual models.
+  input_mode_probs: [0.0, 0.0, 1.0]
+  ema_decay: 0.0          # 0 disables the weight average
+  val_check_interval: 1.0
+  log_every_n_steps: 10
+  save_top_k: 10
+  # Skip a batch that runs out of GPU memory instead of stopping the run.
+  # This is for the occasional oversized batch: the run stops with an
+  # explanation when more batches than this are skipped in a row, or more
+  # than this share of an epoch.
+  skip_oom_batches: true
+  max_skipped_in_a_row: 10
+  max_skipped_share: 0.05
+  accelerator: auto
+  devices: 1
+
+decode:
+  # Input mode used for validation and testing; empty = model.modality.
+  input_mode: ""
+  beam_size: 40
+  ctc_weight: 0.1
+  length_bonus: 0.0
+  # Validate with fast CTC best-path decoding on this many utterances
+  # (0 = all). Beam search is used for the test set.
+  val_max_utts: 0
+  snr_target: null

@@ -1,0 +1,11 @@
+# ~250M parameters: the Auto-AVSR model. Matches the public checkpoints;
+# needs a large-memory GPU to train.
+model:
+  adim: 768
+  aheads: 12
+  eunits: 3072
+  elayers: 12
+  dunits: 3072
+  dlayers: 6
+  fusion:
+    hidden: 8192

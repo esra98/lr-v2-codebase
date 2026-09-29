@@ -1,0 +1,21 @@
+# Separate models per modality versus one unified model.
+name: modality
+description: >
+  Video-only, audio-only and audio-visual models, and a single shared-encoder
+  model trained on randomly chosen input modes (the supervised part of USR,
+  Haliassos et al. 2024). The unified arm reports val/cer_video,
+  val/cer_audio and val/cer_audiovisual.
+control: video
+seeds: [1, 2]
+metrics: [val/cer, val/cer_video, val/cer_audio, val/cer_audiovisual, val/loss]
+files: [configs/exp/_local_small.yaml]
+overrides: []
+arms:
+  video: [model.modality=video]
+  audio: [model.modality=audio]
+  audiovisual: [model.modality=audiovisual, model.fusion.type=late_mlp, data.max_frames_per_batch=600]
+  unified:
+    - model.modality=audiovisual
+    - model.fusion.type=early_shared
+    - "train.input_mode_probs=[0.4,0.2,0.4]"
+    - data.max_frames_per_batch=600

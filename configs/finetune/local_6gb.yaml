@@ -1,0 +1,23 @@
+# Settings that let configs/finetune/vsr_base.yaml run on a 6 GB GPU, to check
+# that fine-tuning starts and the dataset is read correctly. Pass it after
+# vsr_base.yaml. It is a trial on part of the data, not a way to train the model.
+#
+#   python scripts/train.py -c configs/finetune/vsr_base.yaml -c configs/finetune/local_6gb.yaml
+
+data:
+  # The longest clip has 252 frames; a batch holds one such clip or several shorter ones.
+  max_frames_per_clip: 252
+  max_frames_per_batch: 252
+  max_batch_size: 16
+  num_workers: 6
+  limit_train: 8000
+  limit_val: 400
+
+train:
+  # One update per batch: a short trial needs many updates more than it
+  # needs large batches.
+  accumulate_grad_batches: 1
+  max_epochs: 3
+  warmup_epochs: 0.05
+  hold_pretrained_epochs: 0.2
+  save_top_k: 1

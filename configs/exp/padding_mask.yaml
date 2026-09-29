@@ -1,0 +1,14 @@
+# Masking padded frames inside the Conformer convolution modules.
+name: padding_mask
+description: >
+  Auto-AVSR lets padded frames leak into real frames through the Conformer
+  convolutions during batched training, while test clips are decoded alone.
+  This compares that behaviour with padding masked out.
+control: original
+seeds: [1, 2, 3]
+metrics: [val/cer, val/wer, val/loss]
+files: [configs/exp/_local_video.yaml]
+overrides: []
+arms:
+  original: [model.mask_conv_padding=false]
+  masked: [model.mask_conv_padding=true]

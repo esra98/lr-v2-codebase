@@ -1,0 +1,16 @@
+# What training and evaluation need. Tested with Python 3.10 and 3.13.
+#
+# If the machine already has a working PyTorch, keep it. Otherwise install a
+# build that matches the NVIDIA driver BEFORE installing this file: the
+# default build may need a newer driver than the machine has. For example,
+# for drivers that support CUDA 12.6:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu126
+torch>=2.2
+pytorch-lightning>=2.2
+omegaconf>=2.3
+sentencepiece>=0.2
+av>=12
+soundfile>=0.12
+numpy
+tensorboard
+pytest
