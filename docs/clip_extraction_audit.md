@@ -120,9 +120,73 @@ audio reaches the dataset. This matters for audio and audio-visual training.
 The `.aac` files have the full audio but do not line up with the shortened
 video either.
 
-## 4. To do
+## 4. Dotted and dotless I are merged
+
+The transcripts write both `i` and `ı` as `I` (section 2 of
+`docs/dataset_construction.md`: 871,668 `I` against 5,372 `İ`). The
+extraction code is the cause. `utils/lrs_cropper.py`, `_write_lrs2_annotation`:
+
+```python
+lines = [f"Text:  {sentence.upper()}"]
+...
+lines.append(f"{text.upper()} {s:.4f} {e:.4f} {conf:.4f}")
+```
+
+Python's `str.upper()` is not Turkish-aware: `"ışık iyi İstanbul".upper()`
+gives `IŞIK IYI İSTANBUL`. Whisper writes Turkish in mixed case with `i` and
+`ı` distinct, and the distinction is lost only when the label file is
+written. The few `İ` that survive are capitals Whisper emitted itself, mostly
+at the start of names. `utils/generate_lrs2.py` has the same two lines.
+
+Why it matters:
+
+- `i`/`ı` changes words: `KIR`/`KİR`, `SIR`/`SİR`, `ILIK`/`ILİK`, and
+  every suffix that follows vowel harmony (`-DI`/`-Dİ`, `-LI`/`-Lİ`,
+  `-SIZ`/`-SİZ`).
+- With the merge, a model cannot learn the difference and WER does not count
+  it. Its output cannot be shown as correct Turkish without a separate
+  restoration step.
+- `avsr/text/normalize.py` merges `İ` into `I` by default
+  (`merge_dotted_i=True`) to keep the targets consistent with the broken
+  labels. The flag already exists, so the training side can be switched once
+  the labels are fixed.
+
+**The labels can likely be recovered without transcribing again.**
+`generate_timestamp.py` stores Whisper's original output in
+`timestamps/<session>_ts.json`, before upper-casing. If those files are still
+on the extraction machine, every word of every clip is there in its original
+case, with the same start and end times.
+
+Plan, to be checked before training:
+
+1. Confirm that `timestamps/*_ts.json` exists for all 33 sessions.
+2. Match each clip's `.txt` to its words in the JSON. Clip numbers cannot be
+   recomputed, because clips that failed face detection or muxing were
+   skipped without using a number. Match on the word sequence instead:
+   words upper-cased with `str.upper()`, and word durations (end − start),
+   which are written to 4 decimals and do not depend on the clip start.
+3. Rewrite the `Text:` line and the word lines with Turkish upper-casing
+   (`i` → `İ`, `ı` → `I`, then `upper()`), keeping times and confidences.
+   Write to a new folder so the raw corpus stays unchanged.
+4. Check that every clip was matched exactly once, and report clips that were
+   not.
+5. Build with `merge_dotted_i=False`. The alphabet grows from 31 to 32
+   letters, the number speller (`_ONES`, `_TENS` and `_SCALES` in `normalize.py`) must then produce `BİR`,
+   `İKİ`, `MİLYON`…, and the tokenizer must be trained again.
+6. Repeat the `I`/`İ` count of section 2. In correctly cased Turkish the two
+   are about equally frequent.
+
+If the JSON files are lost, the distinction cannot be recovered from the
+labels. It would need a new transcription, or a restoration model applied
+to the text.
+
+## 5. To do
 
 **In this repository, before training.**
+
+- [ ] Find the Whisper JSON files and restore `i`/`ı` as in section 4.
+      Decide whether training waits for this; a model trained on merged
+      labels cannot be compared by WER with one trained on restored labels.
 
 - [ ] Add a frame-count check: remove a clip if it has more than 2 frames
       fewer than round((end of last word + 0.04) · 25). The frame count and
@@ -136,6 +200,8 @@ video either.
 - [ ] `_crop_frames`: keep frames without a single detected face, using the
       last valid box, instead of `continue`.
 - [ ] `_mux`: remove `-shortest`, so the audio is never cut.
+- [ ] `_write_lrs2_annotation` (also in `generate_lrs2.py`): upper-case with
+      Turkish rules, or keep Whisper's original case.
 - [ ] `generate_timestamp.py`: `condition_on_previous_text=False`,
       `vad=True`, and a larger model (`medium` or `large-v3`).
 - [ ] Read frames in order instead of calling `cap.set(CAP_PROP_POS_FRAMES)`
