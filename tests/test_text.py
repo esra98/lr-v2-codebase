@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from avsr.text.labels import parse_label_file
-from avsr.text.normalize import normalize_text, number_to_words
+from avsr.text.normalize import TURKISH_ALPHABET, normalize_text, number_to_words
 from avsr.text.tokenizer import CharTokenizer, SentencePieceTokenizer, train_sentencepiece
 
 
@@ -10,18 +10,18 @@ from avsr.text.tokenizer import CharTokenizer, SentencePieceTokenizer, train_sen
     "n, expected",
     [
         (0, "SIFIR"),
-        (1, "BIR"),
+        (1, "BİR"),
         (10, "ON"),
-        (17, "ON YEDI"),
+        (17, "ON YEDİ"),
         (100, "YÜZ"),
-        (101, "YÜZ BIR"),
-        (200, "IKI YÜZ"),
-        (1000, "BIN"),
-        (1921, "BIN DOKUZ YÜZ YIRMI BIR"),
-        (2025, "IKI BIN YIRMI BEŞ"),
-        (21000, "YIRMI BIR BIN"),
-        (1000000, "BIR MILYON"),
-        (1001000, "BIR MILYON BIN"),
+        (101, "YÜZ BİR"),
+        (200, "İKİ YÜZ"),
+        (1000, "BİN"),
+        (1921, "BİN DOKUZ YÜZ YİRMİ BİR"),
+        (2025, "İKİ BİN YİRMİ BEŞ"),
+        (21000, "YİRMİ BİR BİN"),
+        (1000000, "BİR MİLYON"),
+        (1001000, "BİR MİLYON BİN"),
     ],
 )
 def test_number_to_words(n, expected):
@@ -34,14 +34,14 @@ def test_number_to_words(n, expected):
         ("MERSIN MILLETVEKILI", "MERSIN MILLETVEKILI"),
         ("BIR ŞEY.", "BIR ŞEY"),
         ("VE YAVUZ BIR ARALARINDAN,", "VE YAVUZ BIR ARALARINDAN"),
-        ("17-25 ARALIĞI", "ON YEDI YIRMI BEŞ ARALIĞI"),
-        ("1 NISAN 1921'DE GIRESUNUZ", "BIR NISAN BIN DOKUZ YÜZ YIRMI BIRDE GIRESUNUZ"),
-        ("%50", "YÜZDE ELLI"),
-        ("3,5 MILYON", "ÜÇ VIRGÜL BEŞ MILYON"),
-        ("1.250.000 LIRA", "BIR MILYON IKI YÜZ ELLI BIN LIRA"),
+        ("17-25 ARALIĞI", "ON YEDİ YİRMİ BEŞ ARALIĞI"),
+        ("1 NISAN 1921'DE GIRESUNUZ", "BİR NISAN BİN DOKUZ YÜZ YİRMİ BİRDE GIRESUNUZ"),
+        ("%50", "YÜZDE ELLİ"),
+        ("3,5 MILYON", "ÜÇ VİRGÜL BEŞ MILYON"),
+        ("1.250.000 LIRA", "BİR MİLYON İKİ YÜZ ELLİ BİN LIRA"),
         ("TÜRKIYE'NIN", "TÜRKIYENIN"),
-        ("İSTANBUL HÂLÂ", "ISTANBUL HALA"),
-        ("istanbul ılık", "ISTANBUL ILIK"),
+        ("İSTANBUL HÂLÂ", "İSTANBUL HALA"),
+        ("istanbul ılık", "İSTANBUL ILIK"),
         ("NE?  NASIL!", "NE NASIL"),
         ("...", ""),
     ],
@@ -50,8 +50,13 @@ def test_normalize_text(raw, expected):
     assert normalize_text(raw) == expected
 
 
-def test_normalize_keeps_dotted_i_when_asked():
-    assert normalize_text("istanbul ılık", merge_dotted_i=False) == "İSTANBUL ILIK"
+def test_normalize_can_reproduce_the_old_merged_alphabet():
+    assert normalize_text("istanbul ılık", merge_dotted_i=True) == "ISTANBUL ILIK"
+    assert "İ" not in normalize_text("1921 İZMİR", merge_dotted_i=True)
+
+
+def test_alphabet_has_both_i_letters():
+    assert "I" in TURKISH_ALPHABET and "İ" in TURKISH_ALPHABET and len(TURKISH_ALPHABET) == 29
 
 
 def test_normalize_is_idempotent():

@@ -1,0 +1,9 @@
+Text:  Adaletsiz yargı, kayyım rejimi, muhalefet belediyelerine saldırılar, dil,
+Adaletsiz 0.040 0.880 0.996
+yargı, 0.880 1.480 0.999
+kayyım 1.480 2.180 0.863
+rejimi, 2.180 2.620 1.000
+muhalefet 2.740 3.860 0.999
+belediyelerine 3.860 4.540 1.000
+saldırılar, 4.540 5.200 1.000
+dil, 5.400 5.940 0.997

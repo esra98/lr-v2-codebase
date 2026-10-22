@@ -1,38 +1,39 @@
 # Notes for later work
 
-Dataset cleaning, part of which is done, and low-latency (streaming)
+Dataset cleaning, most of which is done, and low-latency (streaming)
 recognition, which is not started. Recorded here so the decisions and the
 reasoning are not lost.
 
 ## 1. Dataset cleaning
 
-### Decisions (2026-09-27)
+### Decisions
 
-- The transcripts were produced with Whisper. They will **not** be
-  re-transcribed with Whisper: a second pass of the same model is expected to
-  repeat most of the same mistakes.
-- Cleaning is analytical. Recurrent transcripts are detected and removed now;
-  further checks are listed below.
+- 2026-09-27: the transcripts were produced with Whisper `small` and would
+  not be re-transcribed with the same model. Cleaning is analytical.
+- 2026-10-17: the corpus is rebuilt from the full recordings
+  (`docs/audit_and_roadmap_2026-10-17.md`), re-transcribed with
+  `large-v3` and cut into utterances at sentence ends and pauses. This
+  recovered the dotted and dotless I and cut the share of recurrent or
+  invented transcripts from 10.6 % to 0.8 %.
 
 ### What a rebuild needs
 
-The dataset contains only the clips that pass the cleaning, so a change of
-the rules means building it again. That is cheap as long as the following are
-kept on the local machine: with cached landmarks a rebuild of the whole corpus
-takes about an hour and a half instead of most of a day.
+The dataset contains only the utterances that pass the cleaning, so a change
+of the rules means building it again. With the per-session state kept, that
+is cheap: a rule change in `segment` reruns the text rules in seconds, and a
+crop change in `cut` reuses the landmarks.
 
 | Kept | Where | Used for |
 |---|---|---|
-| Original label files with word times and confidences | `data/raw/<session>/*.txt` | every text-based check |
-| Landmark tracks | `data/cache/landmarks/` | re-cropping without detecting faces again |
-| Clip table | `data/tr-lrs-clean-ptm.clips.tsv` | verdict, split, detection rate and head turn of every clip |
+| Transcripts with word times, confidences and decoder statistics | `work/<session>/transcript.json` | every text-based check |
+| Landmark tracks of the chosen speaker | `work/<session>/landmarks/` | re-cropping without detecting faces again |
+| Clip table | `dataset/tr-lrs-v3.clips.tsv` | verdict, split, detection rate and head turn of every utterance |
 
 ### Implemented
 
-Results for the whole corpus are in `docs/label_audit.md`, produced by
-`scripts/audit_labels.py`. The same rules are applied by
-`scripts/build_dataset.py`, which records the verdict for every clip in the
-clip table next to the dataset.
+The rules are applied by `scripts/corpus.py segment` (text) and `cut`
+(video); `build` records the verdict of every utterance in the clip table
+next to the dataset, and `docs/dataset_construction.md` has the counts.
 
 | Rule | How it works |
 |---|---|
@@ -40,7 +41,8 @@ clip table next to the dataset.
 | Bursty sentence | a sentence that occurs at least 3 times in a session, mostly in bursts, is rejected throughout that session |
 | Internal loop | a group of 1 to 4 words repeated 3 or more times in a row, or text that compresses by more than 2.4 times |
 | Invented phrase | subtitle credits and sign-offs, when they make up at least half of the transcript |
-| Squeezed words, speaking rate, confidence, timing | thresholds in `FilterConfig` |
+| Squeezed words, speaking rate, confidence | thresholds in `FilterConfig` |
+| No speech | Whisper's own `no_speech_prob` above 0.6 (`SegmentConfig`) |
 
 How the thresholds were chosen:
 
@@ -80,25 +82,30 @@ better, but that is a separate project.
 
 | # | Check | Catches | Needs |
 |---|---|---|---|
-| 1 | Restoring dotted and dotless I from a Turkish lexicon and vowel harmony | the casing loss: both letters are `I` in the labels | a lexicon or morphological analyser |
-| 2 | Loss-based filtering with a first trained audio model | labels that disagree with the audio | one trained model |
-| 3 | Duplicated footage across sessions, by label sequences or audio fingerprints | the same recording under two names | labels, audio |
-| 4 | Lip opening inside word boundaries | transcript of another segment | labels, landmarks |
+| 1 | Loss-based filtering with a first trained audio model | labels that disagree with the audio | one trained model |
+| 2 | Duplicated footage across recordings, by label sequences or audio fingerprints | the same session under two names | labels, audio |
+| 3 | Lip opening inside word boundaries | transcript of another segment | labels, landmarks |
+| 4 | Audio-visual synchronisation score of the chosen face | the listener chosen instead of the speaker | a synchronisation model |
 
-Check 2 is not circular in the way re-transcription is: it uses a model
+Check 1 is not circular in the way re-transcription is: it uses a model
 trained on this data to find labels that are inconsistent with the rest.
+The dotted-I restoration that was on this list is no longer needed: the
+new transcripts carry Whisper's casing.
 
 ### Open items
 
-- Tarballs 15 to 33 contain folders named `video-1` to `video-19`, which do
-  not match the tarball numbers (`video-15.tar.gz` holds `video-1`). Session
-  identity comes from the folder name. No two tarballs share a folder name.
-- The test set is two whole sessions with few recurrent transcripts
-  (`2025-2026-birlesim-3`, `video-10`). It deserves a manual check of a few
-  hundred clips, because every reported number depends on it.
-- The confidence threshold rejects 11.3 % of clips and is the largest single
-  cause of rejection. Whether low confidence really means a wrong transcript
-  has not been verified.
+- The test set is two whole recordings with few recurrent transcripts
+  (`2025-2026-birlesim-3`, `yt-NPJohShU_iw`). It deserves a manual check of
+  a few hundred clips, because every reported number depends on it.
+- The confidence threshold rejects 2.3 % of utterances and is the largest
+  text-based cause of rejection. Whether low confidence really means a
+  wrong transcript has not been verified on the new transcripts.
+- 13 % of the utterances have no usable face (wide shots, the chair while a
+  member speaks from the floor). Nothing can be done about them without
+  other footage.
+- The speaker choice by lip motion was checked on a few dozen clips, not
+  measured. A sample of the clips with two or more candidate faces (12 % of
+  the dataset) should be inspected.
 
 ## 2. Low-latency recognition
 

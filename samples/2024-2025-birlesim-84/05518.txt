@@ -1,0 +1,7 @@
+Text:  aşiretlerin kanat önderlerinin araya girmesiyle aralarında
+aşiretlerin 0.040 1.280 0.868
+kanat 1.280 1.680 0.562
+önderlerinin 1.680 2.320 0.952
+araya 2.320 2.540 0.983
+girmesiyle 2.540 3.140 0.978
+aralarında 3.140 4.380 0.998

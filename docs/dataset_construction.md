@@ -1,302 +1,258 @@
-# Construction and cleaning of the TR-LRS training dataset
+# Construction of the TR-LRS corpus (version 3, October 2026)
 
-This document describes how the training dataset `tr-lrs-clean-ptm` was
-derived from the raw TR-LRS corpus: which clips were removed and why, how the
-mouth region was extracted, how Partition-Time Masking was applied, and how
-the result was verified. It is written to support the methods section of a
-paper. Every number was measured on the dataset built on 2026-09-28.
+How the dataset `dataset/tr-lrs-v3` was made from the full-length recordings
+of the Grand National Assembly of Türkiye: how the recordings were
+transcribed, cut into utterances, cleaned, cropped to the mouth region, split
+and verified. It is written to support the methods section of a paper. Every
+number was measured on the dataset built on 2026-10-22.
 
-Items marked **[to be completed by the authors]** concern the creation of the
-raw corpus, which happened before this work and is not recorded in the
-project.
+The first corpus (September 2026) was built from 224x224 face clips whose
+transcripts had lost the distinction between dotted and dotless I; its
+construction is recorded in `docs/archive/dataset_construction_v2_2026-09-28.md`.
+Version 3 starts again from the recordings, so every step is in this
+repository and reproducible with `scripts/corpus.py`.
 
 ## 1. Summary
 
-| | Clips | Hours |
+| | Utterances | Hours |
 |---|---|---|
-| Raw corpus | 218,091 | 144.6 ¹ |
-| Removed by the transcript rules (section 4) | 58,978 | |
-| Removed by the video checks (section 5) | 4,922 | |
-| **Dataset** | **154,191 (70.7 %)** | **105.4** |
+| Recordings | 39 | 332.4 (video) |
+| Utterances found by the transcription | 272,258 | 271.0 (speech spans) |
+| Removed by the transcript rules (section 4) | 10,963 (4.0 %) | |
+| Removed by the video checks (section 5) | 35,318 (13.0 %) | |
+| **Dataset** | **225,977 (83.0 %)** | **224.6** |
 
-¹ Measured to the end of the last word of each transcript, since the clip
-lengths of removed clips were not all read.
+| Split | Clips | Hours | Sessions |
+|---|---|---|---|
+| Training | 208,811 | 207.8 | 37 |
+| Validation | 10,993 | 10.5 | 37 |
+| Test | 6,173 | 6.4 | 2 |
 
-The dataset keeps the file layout of the raw corpus. It differs from it in
-three ways: unreliable clips are removed, the video shows the 96x96 mouth
-region instead of the 224x224 face, and Partition-Time Masking is written
-into the video of the training clips.
+The clips have the LRS2 layout, `<session>/<utterance>.mp4` with a
+`<utterance>.txt` next to it: a 96x96 colour mouth crop at 25 frames per
+second with the 16 kHz mono audio of the utterance in the same file, and a
+label file with the sentence in Whisper's own casing and one line per word
+with start time, end time and confidence.
 
-## 2. Raw corpus
+## 2. Recordings
 
 | Property | Value |
 |---|---|
-| Content | speeches in the Grand National Assembly of Türkiye |
-| Sessions | 33, one folder each |
-| Clips | 218,091 |
-| Video | 224x224 face crop, H.264 (High profile), yuv420p, 25 frames per second |
-| Audio | AAC-LC, 16 kHz, mono, inside the mp4 and again as a separate `.aac` file |
-| Transcript | one `.txt` per clip: the sentence, then one line per word with start time, end time and confidence |
-| Transcript source | automatic speech recognition (Whisper) |
+| Content | plenary sessions of the Grand National Assembly of Türkiye |
+| Recordings | 39: 19 from the assembly's own archive (`<term>-birlesim-<n>`), 20 from the assembly's YouTube channel (`yt-<video id>`) |
+| Length | 332.4 hours; 4.4 to 11.6 hours per recording |
+| Video | 1920x1080, 30 frames per second, H.264 |
+| Audio | AAC, 44.1 kHz stereo (downloads) or as broadcast; converted to 16 kHz mono |
+| Size | 180 GB |
 
-**[to be completed by the authors]**: the Whisper model and version, the
-decoding settings, how the recordings were cut into clips, and how the faces
-were detected and cropped to 224x224.
+YouTube recordings were fetched with `yt-dlp` at the largest H.264 format up
+to 1080p (`scripts/corpus.py download`). Two recordings that were only
+available at 360p were replaced by their 1080p versions before cutting; no
+recording below 720p was cut. `videos/sources.tsv` lists every recording with
+its resolution, length, size and SHA-256 checksum.
 
-Two properties of the transcripts matter for everything below.
-
-**They are machine generated.** No transcript was checked by a person. The
-corpus therefore contains the typical errors of the recogniser, described in
-section 4.
-
-**Dotted and dotless I cannot be told apart.** The text is upper case, and
-the upper-casing did not follow Turkish rules, so both `i` and `ı` became
-`I`. The raw transcripts contain 871,668 `I` and 5,372 `İ`; in correctly
-cased Turkish the two are about equally frequent. The distinction cannot be
-recovered from the transcripts.
+The recordings show the rostrum, the chair and the chamber from a few fixed
+cameras, with cuts between them every few seconds. Close-ups of the speaker
+regularly show one or two listeners behind or beside them.
 
 ## 3. Procedure
 
-Each session is processed on its own, in clip order.
+Each recording is processed on its own, in four stages that are each
+resumable and are only repeated when their inputs or options change
+(`work/<session>/status.json` records a hash of both).
 
-| Step | Input | Decides |
-|---|---|---|
-| 1. Parse and normalise the transcript | `.txt` | malformed or empty transcripts |
-| 2. Transcript checks | normalised text, word times, confidences | invented, recurrent, implausible or uncertain transcripts |
-| 3. Assign the split | clips that passed step 2 | training, validation or test |
-| 4. Read the video | `.mp4` | wrong frame rate, too short, too long, text that does not fit the length |
-| 5. Detect face landmarks | frames | clips without a reliably detected face |
-| 6. Crop the mouth region | frames, landmarks | |
-| 7. Apply Partition-Time Masking | training clips only | |
-| 8. Write the clip | | |
+| Stage | Input | Output | Decides |
+|---|---|---|---|
+| 1. Transcribe | recording | `transcript.json` | the words, their times and confidences |
+| 2. Segment | transcript | `segments.tsv` | utterance boundaries; the transcript verdicts (section 4) |
+| 3. Cut | recording, segments | clips, `clips.tsv`, `landmarks/` | the speaker; the video verdicts (section 5); the crop (section 6) |
+| 4. Build | all `clips.tsv` | clip table, manifests | the split (section 7) |
 
-A clip is removed at the first check it fails, so every removed clip is
-counted under exactly one reason. Steps 1 to 3 need no video, which is why
-face detection, by far the most expensive step, runs only on clips whose
-transcript is usable.
+Stage 3 only reads the utterances that passed stage 2, so face detection,
+by far the most expensive step, never runs on a rejected transcript. An
+utterance is removed at the first check it fails, so every removed utterance
+is counted under exactly one reason.
+
+### 3.1 Transcription
+
+| Setting | Value |
+|---|---|
+| Recogniser | Whisper `large-v3` through `faster-whisper` 1.2.1 (CTranslate2 4.8.3) |
+| Precision | `int8_float16` (the model then fits a 6 GB GPU) |
+| Language | Turkish, fixed |
+| Decoding | beam search, 5 beams; word timestamps; Silero voice-activity filter; no conditioning on the previous window |
+| Chunks | 20 minutes of 16 kHz mono audio extracted with `ffmpeg`; 1,017 chunks in all |
+
+Each chunk is transcribed independently and saved; the chunks are merged
+with their times shifted into the recording. The transcript keeps the text
+in Whisper's casing and, for every Whisper segment, its `no_speech_prob`,
+`avg_logprob` and `compression_ratio`. No transcript was checked by a
+person.
+
+### 3.2 Segmentation
+
+The words of each Whisper segment are grouped into utterances:
+
+1. Whisper segment boundaries are never crossed.
+2. A word ending in `.`, `?` or `!` ends the utterance.
+3. A pause longer than 0.4 s between two words ends the utterance.
+4. An utterance longer than 10 s is split at its longest internal pause,
+   repeatedly, so no word is cut in the middle.
+5. Utterances with fewer than 2 words or shorter than 0.4 s are dropped.
+
+The span of an utterance runs from 0.04 s before its first word to 0.04 s
+after its last word. Utterances are numbered in time order within the
+recording (`00000`, `00001`, ...); rejected ones keep their number and leave
+a gap in the dataset folder.
 
 ## 4. Transcript cleaning
 
 ### 4.1 Normalisation
 
-Transcripts are compared, and later used as training targets, in a normalised
-form. The `.txt` files in the dataset are not changed.
+Transcripts are compared, and used as training targets, in a normalised
+form. The label files keep Whisper's text unchanged.
 
 | Rule | Example |
 |---|---|
 | Unicode NFC | |
-| Circumflex removed | `HÂLÂ` becomes `HALA` |
-| Digits spelled out in Turkish | `1921` becomes `BIN DOKUZ YÜZ YIRMI BIR` |
-| A suffix after an apostrophe joins the number | `1921'DE` becomes `... YIRMI BIRDE` |
-| Thousands dots and decimal commas | `1.250.000`, `3,5` becomes `ÜÇ VIRGÜL BEŞ` |
-| Percent sign | `%50` becomes `YÜZDE ELLI` |
-| Apostrophes removed, joining the suffix | `TÜRKIYE'NIN` becomes `TÜRKIYENIN` |
-| `İ` merged into `I` | see section 2 |
+| Circumflex removed | `hâlâ` becomes `HALA` |
+| Upper case with Turkish casing | `i` becomes `İ`, `ı` becomes `I` |
+| Digits spelled out in Turkish | `1921` becomes `BİN DOKUZ YÜZ YİRMİ BİR` |
+| A suffix after an apostrophe joins the number | `1921'de` becomes `... YİRMİ BİRDE` |
+| Thousands dots, decimal commas, percent | `1.250.000`; `3,5` becomes `ÜÇ VİRGÜL BEŞ`; `%50` becomes `YÜZDE ELLİ` |
+| Apostrophes removed, joining the suffix | `Türkiye'nin` becomes `TÜRKİYENİN` |
 | Everything that is not a letter becomes a space | punctuation, hyphens |
 
-The resulting alphabet has 31 letters: the 28 Turkish letters that remain
-after merging `İ` into `I`, and `Q`, `W`, `X` for foreign words.
+The alphabet has 32 letters: the 29 letters of Turkish and `Q`, `W`, `X`
+for foreign words (which occur 10, 172 and 59 times in the dataset). The
+dataset contains 899,103 `İ` and 450,382 `I`, in line with the frequencies
+of the two letters in written Turkish.
 
 ### 4.2 Rules
 
-Let a session contain clips c₁ … cₙ in recording order, with normalised
+Let a recording contain utterances u₁ … uₙ in time order, with normalised
 transcripts t₁ … tₙ, each a sequence of words.
 
-**R1. Known invented phrase.** Speech recognisers trained on subtitled video
-emit subtitle credits and sign-offs on silence or noise. A clip is removed if
-one of the phrases below occurs in its transcript as a sequence of whole
-words and makes up at least half of its words.
+**R1. Known invented phrase.** Whisper emits subtitle credits and sign-offs
+from its training data on silence or noise. An utterance is removed if one of
+the phrases below occurs in it as a sequence of whole words and makes up at
+least half of its words.
 
-`ALTYAZI M K`, `ALTYAZI`, `ABONE OL`, `IZLEDIĞINIZ IÇIN TEŞEKKÜR`,
-`IZLEDIĞINIZ IÇIN TEŞEKKÜRLER`, `BIR SONRAKI VIDEODA GÖRÜŞMEK ÜZERE`,
-`SESLENDIREN`, `ÇEVIRI VE ALTYAZI`
+`ALTYAZI M K`, `ALTYAZI`, `ABONE OL`, `İZLEDİĞİNİZ İÇİN TEŞEKKÜR`,
+`İZLEDİĞİNİZ İÇİN TEŞEKKÜRLER`, `BİR SONRAKİ VİDEODA GÖRÜŞMEK ÜZERE`,
+`SESLENDİREN`, `ÇEVİRİ VE ALTYAZI`
 
-The half-of-the-words condition keeps genuine sentences that merely contain
-the words, for example a speech about subscriptions.
-
-**R2. Internal loop.** A clip is removed if a group of 1 to 4 words is
-repeated at least 3 times in a row (`DA DA DA`, `VE BU VE BU VE BU`), or if
-its transcript has at least 40 characters and compresses by a factor above
-2.4 with zlib. The compression-ratio test and its threshold are those Whisper
-uses itself to detect failed decoding.
+**R2. Internal loop.** An utterance is removed if a group of 1 to 4 words is
+repeated at least 3 times in a row, or if its transcript has at least 40
+characters and compresses by a factor above 2.4 with zlib (the test Whisper
+uses itself to detect failed decoding).
 
 **R3. Burst.** Two transcripts are *the same* if they are identical, or if
-both have at least 5 words and
+both have at least 5 words and 1 − d(tᵢ, tⱼ) / max(|tᵢ|, |tⱼ|) ≥ 0.8, where
+d is the edit distance in words. Utterance uᵢ is removed if some uⱼ of the
+same recording with 0 < |i − j| ≤ 5 has the same transcript. All members of
+a burst are removed, because nothing indicates which of them is correct.
 
-  1 − d(tᵢ, tⱼ) / max(|tᵢ|, |tⱼ|) ≥ 0.8,
+**R4. Bursty sentence.** If a sentence occurs at least 3 times in a
+recording and at least half of those occurrences were removed by R3, its
+remaining occurrences in that recording are removed too.
 
-where d is the edit distance counted in words. Clip cᵢ is removed if some
-clip cⱼ of the same session with 0 < |i − j| ≤ 5 has the same transcript.
-All clips of a burst are removed, not all but one, because nothing indicates
-which of them, if any, is correct.
+**R5. Squeezed words.** A word is squeezed if it lasts less than 15 ms per
+character. An utterance is removed if more than 25 % of its words are
+squeezed.
 
-**R4. Bursty sentence.** If a sentence occurs at least 3 times in a session
-and at least half of those occurrences were removed by R3, its remaining
-occurrences in that session are removed too. Other sessions are not
-affected.
+**R6. Low confidence.** An utterance is removed if the mean word confidence
+is below 0.80 or any word's confidence is below 0.30.
 
-**R5. Squeezed words.** A word is *squeezed* if its duration is below 15 ms
-per character. A clip is removed if more than 25 % of its words are squeezed.
-Invented words are typically assigned one or two timestamp steps regardless
-of their length.
+**R7. No speech.** An utterance is removed if Whisper's `no_speech_prob` for
+its window is above 0.6. On this corpus invented transcripts have a median
+of 0.7 to 0.8 and genuine ones 0.03.
 
-**R6. Low confidence.** A clip is removed if the mean confidence of its words
-is below 0.80, or if any word has a confidence below 0.30.
+**R8. Speaking rate.** An utterance is removed if it has fewer than 4 or
+more than 25 letters per second of its span.
 
-**R7. Speaking rate.** A clip is removed if it has fewer than 4 or more than
-25 letters per second of video.
-
-**R8. Timing.** A clip is removed if the end of its last word and the end of
-the video differ by more than 1 second.
-
-R7 and R8 need the length of the video and are therefore applied in step 4.
+The thresholds of R1 to R6 are those of the first corpus, where they were
+derived from the data and examined (see the archived document, section
+4.4). R7 is new: the first corpus had no access to Whisper's own estimate.
+The timing rule of the first corpus (speech must end near the end of the
+clip) is no longer needed, because the clips are cut around the words.
 
 ### 4.3 Result
 
-| Rule | Clips removed | Share of raw corpus |
+| Rule | Utterances removed | Share |
 |---|---|---|
-| R1 known invented phrase | 1,072 | 0.5 % |
-| R2 internal loop | 441 | 0.2 % |
-| R3 burst | 21,400 | 9.8 % |
-| R4 bursty sentence | 101 | 0.0 % |
-| R5 squeezed words | 2,025 | 0.9 % |
-| R6 low confidence | 24,998 | 11.5 % |
-| R7 speaking rate | 5,408 | 2.5 % |
-| R8 timing | 3,533 | 1.6 % |
-| Malformed or empty transcript | 0 | 0.0 % |
-| **Transcript, total** | **58,978** | **27.0 %** |
+| R1 known invented phrase | 11 | 0.0 % |
+| R2 internal loop | 142 | 0.1 % |
+| R3 burst | 1,867 | 0.7 % |
+| R4 bursty sentence | 151 | 0.1 % |
+| R5 squeezed words | 166 | 0.1 % |
+| R6 low confidence | 6,191 | 2.3 % |
+| R7 no speech | 2,062 | 0.8 % |
+| R8 speaking rate | 373 | 0.1 % |
+| **Transcript, total** | **10,963** | **4.0 %** |
 
-R1 to R4 together, the recurrent and invented transcripts, remove 23,014
-clips (10.6 %).
+The first corpus lost 27 % of its clips to the transcript rules, 10.6 % to
+recurrent or invented transcripts alone. With `large-v3`, the voice-activity
+filter and no conditioning on the previous window, the recurrent and
+invented transcripts (R1 to R4) fall to 0.8 %, and the confidence rule to
+2.3 %. The median word confidence of the kept utterances is 0.984; the 5th
+percentile is 0.90.
 
-The amount of recurrence differs greatly between sessions (section 9). In
-two sessions most transcripts are invented: in `2024-2025-birlesim-94` the
-sentence `ÖZGÜR KARABAT` occurs 6,146 times, in `video-15` the sentence
-`UCUN BIR` occurs 4,314 times. In nine sessions fewer than 1 % of the clips
-are affected.
+## 5. Cutting and video checks
 
-### 4.4 How the thresholds were chosen
+The recording is decoded once from start to end. For each kept utterance,
+the frames nearest to a 25 frames-per-second grid over its span are taken
+(the recordings run at 30 frames per second; a frame is repeated if the
+decoder skips one), and the audio of the span is extracted as 16 kHz mono.
 
-The thresholds of R3 and R4 were derived from the data, those of R6 were
-chosen by judgment and examined afterwards, and those of R5, R7 and R8 were
-chosen by judgment and not examined.
+### 5.1 Face detection
 
-**Bursts (R3, R4).** In five sessions (15,082 clips), every sentence that
-occurred more than once was characterised by the number of sessions it
-occurred in and by the share of its occurrences that had another occurrence
-within 5 clips.
+Landmarks come from the MediaPipe Face Landmarker (`face_landmarker.task`,
+float16, 478 points per face), run on every second frame of the utterance
+with detection and presence thresholds of 0.3 and up to 4 faces per frame;
+landmarks of the frames in between are interpolated linearly in time.
 
-| Sentence | Occurrences | Sessions | Share in bursts |
+The detector shrinks its input to 192x192 pixels, so a face of 200 to 300
+pixels in a 1920x1080 frame is often missed when the whole frame is given to
+it. Faces are therefore searched in square tiles: a copy of the frame shrunk
+to 540 rows is scanned tile by tile (tiles of 540 pixels with half overlap)
+every 16 detections, and every face found is then detected again at full
+resolution inside a square of 2.5 face heights around its last position.
+Faces found twice are merged. On the first recording this raised the number
+of kept utterances from 124 to 276 of 301.
+
+### 5.2 The speaker
+
+Close-ups in the chamber regularly show a listener next to the speaker, and
+the listener is often the larger face. Among the faces present in at least
+half of the sampled frames and at least half as tall as the tallest, the
+speaker is the one whose lip opening (distance between the inner lips,
+divided by the face height) varies most over the utterance. 87.8 % of the
+kept clips have one candidate face; 7.3 % have two, 3.4 % three, and 1.4 %
+four to six.
+
+### 5.3 Checks
+
+| Check | Condition for removal | Utterances removed | Share |
 |---|---|---|---|
-| `ABONE OL` | 407 | 1 | 100 % |
-| `AKLINIZDA GELEBILECEK HER TÜRLÜ` | 306 | 1 | 100 % |
-| `BIR NISAN BIN DOKUZ YÜZ YIRMI BIRDE GIRESUNUZ` | 217 | 1 | 100 % |
-| `TEŞEKKÜR EDERIM` | 19 | 5 | 0 % |
-| `SAYIN BAŞKAN` | 13 | 5 | 0 % |
-| `GENEL KURULU SAYGIYLA SELAMLIYORUM` | 12 | 5 | 0 % |
+| Too short | fewer than 12 frames (0.48 s) | 0 | |
+| Too long | more than 600 frames (24 s) | 0 | |
+| No face | a face is found in fewer than 50 % of the sampled frames | 23,225 | 8.5 % |
+| Low detection rate | a face is found in 50 % to 80 % of the sampled frames | 11,862 | 4.4 % |
+| Small face | median face height below 50 pixels | 11 | 0.0 % |
+| Mouth at the frame edge | the chosen speaker's mouth region leaves the frame | 220 | 0.1 % |
+| **Video, total** | | **35,318** | **13.0 %** |
 
-Invented sentences occur in one session and in bursts. Genuine formulae
-occur in every session and not in bursts. A rule based on bursts therefore
-separates the two, where a rule based on frequency alone would remove the
-formulae as well.
-
-**Approximate matching (R3).** Among neighbouring transcripts that were
-similar but not identical, the genuine pairs were short and differed in one
-word (`IKI BIN ON SEKIZ` and `IKI BIN ON DOKUZ`; `IÇINDE INSAN YOK` and
-`IÇINDE TARIH YOK`), while variants of one invented sentence were longer
-(`… BIRDE GIRESUNUZ` and `… BIRDE GIRESUNUMUZ`, 8 words). Requiring 5 words
-and 80 % agreement keeps the former and removes the latter.
-
-**Confidence (R6).** Two observations support that the confidence carries
-information about errors.
-
-Misrecognised words are often not words, and such a word tends to occur only
-once in the corpus. Among 1,017,449 words:
-
-| Word confidence | Share of all words | Occur only once in the corpus |
-|---|---|---|
-| below 0.30 | 0.5 % | 24.2 % |
-| 0.30 to 0.50 | 2.3 % | 26.4 % |
-| 0.50 to 0.70 | 6.9 % | 18.6 % |
-| 0.70 to 0.80 | 7.3 % | 12.5 % |
-| 0.80 to 0.90 | 13.0 % | 8.9 % |
-| 0.90 to 0.95 | 12.9 % | 5.9 % |
-| 0.95 to 1.00 | 57.0 % | 2.5 % |
-
-Reading 8 random clips per group gave this impression:
-
-| Group | Examples | Impression |
-|---|---|---|
-| Mean below 0.60, removed | `ISTIZYÜN ALTMIŞ IKI`, `YARGI MAANSIZMIŞ` | garbled |
-| Mean 0.70 to 0.80, removed | `GEOGRAFAYA ADI GENIŞ BIR GEOGRAFAYA`; also `GENEL KURULU SAYGIYLA SELAMLIYORUM` | mixed |
-| Mean 0.80 to 0.85, kept | `BAZEN SOPA ILE YAPIYORLAR`; also `ÇARESIZLIĞE SÜLÜKLEMIŞTIR` | mostly correct |
-| Mean above 0.97, kept | `KELIME DEĞIŞIKLIĞI YAPILIYOR` | correct |
-| Removed only for one word below 0.30, mean above 0.85 | `BAŞTA EN AZ DÖRT BEŞ TANE UZMANIN OLMASI GEREKIYOR` | correct |
-
-Share of the clips reaching R6 (193,052) that other thresholds would remove:
-
-| Mean threshold | No word rule | Word below 0.30 | Word below 0.50 |
-|---|---|---|---|
-| 0.60 | 1.1 % | 3.0 % | 12.2 % |
-| 0.70 | 3.6 % | 5.0 % | 12.9 % |
-| **0.80** | 12.5 % | **12.9 %** | 17.5 % |
-| 0.85 | 23.1 % | 23.3 % | 25.4 % |
-| 0.90 | 41.8 % | 41.8 % | 42.1 % |
-
-Of the 24,998 clips removed by R6, 20,372 fail only the mean, 937 only the
-single-word condition, and 3,689 both.
-
-### 4.5 Known costs of the rules
-
-| Rule | Cost |
-|---|---|
-| R3 | genuine formulae spoken in quick succession are removed, for example 31 of the 90 occurrences of `KABUL EDENLER`, which the chair repeats during a series of votes |
-| R6, mean | correct transcripts with a mean between 0.70 and 0.80 are removed along with garbled ones |
-| R6, single word | the 937 clips removed by this condition alone appear to be correct; many contain numbers |
-| All | the rules detect implausible transcripts; a plausible but wrong transcript passes |
-
-### 4.6 A check that was tested and not used
-
-It was tested whether the video itself reveals wrong transcripts, on the
-assumption that invented transcripts arise where the visible person is not
-speaking. For each clip the opening of the lips (distance between the inner
-lips, divided by face height) was correlated with the logarithm of the audio
-energy per video frame, taking the maximum over a lag of −4 to +4 frames.
-
-| Clips | Number | Median correlation | Median lip motion ² |
-|---|---|---|---|
-| Kept | 578 | 0.20 | 0.0192 |
-| Removed by R3 | 532 | 0.24 | 0.0207 |
-| Removed by R1 | 363 | 0.29 | 0.0195 |
-| Removed by R2 | 55 | 0.13 | 0.0172 |
-
-² Standard deviation of the lip opening over the clip.
-
-Clips with invented transcripts show as much lip motion, and as much
-agreement between lips and audio, as kept clips. The speakers in them are
-speaking; the transcript is wrong. The measure does not separate the groups
-and was not used.
-
-## 5. Video checks
-
-| Check | Condition for removal | Clips removed |
-|---|---|---|
-| Frame rate | differs from 25 frames per second | 0 |
-| Too short | fewer than 12 frames (0.48 s) | 2,764 |
-| Too long | more than 600 frames (24 s) | 0 |
-| No face | a face is found in fewer than 50 % of the frames | 807 |
-| Low detection rate | a face is found in 50 % to 80 % of the frames | 1,351 |
-
-Of the 168,054 clips whose transcript passed R1 to R6, 156,349 reached face
-detection, and 154,191 passed it.
+Utterances without a face are mostly wide shots of the chamber and cuts to
+the chair while a member speaks from the floor. A face is found in 99.5 % of
+the sampled frames of the kept clips, and in every sampled frame of 94.4 %
+of them.
 
 ## 6. Mouth region
 
-### 6.1 Landmarks
+### 6.1 Landmarks used
 
-Landmarks are detected in every frame with the MediaPipe Face Landmarker
-(`face_landmarker.task`, float16, 478 points), in single-image mode with
-detection and presence thresholds of 0.3. Of the 478 points, 19 are used:
+Of the 478 points, 19 are used:
 
 | Points | MediaPipe indices |
 |---|---|
@@ -306,238 +262,192 @@ detection and presence thresholds of 0.3. Of the 478 points, 19 are used:
 | Forehead, chin | 10, 152 |
 | Inner lips | 13, 14, 78, 308 |
 
-In the kept clips a face is found in 99.8 % of the frames, and in all frames
-of 96.9 % of the clips. Frames without a detection take landmarks
-interpolated linearly in time between the nearest detections; at the start
-and end of a clip the nearest detection is repeated.
+The landmarks of every kept utterance are stored in
+`work/<session>/landmarks/<utterance>.npz`, so the crop can be redone with
+other settings without detecting faces again.
 
 ### 6.2 Position
 
 The centre of the crop in frame t is the mean of the 8 outer-lip points,
-smoothed over time. Detections jitter by a pixel or two from frame to frame,
-and cropping at the raw positions would turn that jitter into apparent
-motion of the whole mouth region.
-
-Smoothing uses a Kalman filter with a constant-velocity model, applied to
-the two coordinates independently, followed by a Rauch-Tung-Striebel
-backward pass. With state (position, velocity) and one frame as the unit of
-time:
+smoothed over time with a Kalman filter (constant-velocity model, the two
+coordinates independent) followed by a Rauch-Tung-Striebel backward pass.
+With state (position, velocity) and one frame as the unit of time:
 
   F = [[1, 1], [0, 1]], H = [1, 0], Q = q · [[1/4, 1/2], [1/2, 1]], R = r,
 
-with q = 1.0 px² per frame⁴ and r = 4.0 px². The backward pass uses the
-whole clip, so the smoothed position does not lag behind the mouth as it
-would with a filter that only looks back.
+with q = 1.0 px² per frame⁴ and r = 4.0 px². Detections jitter by a pixel
+or two from frame to frame; cropping at the raw positions would turn that
+jitter into apparent motion of the whole mouth region.
 
 ### 6.3 Scale
 
-The side of the cropped square is 0.63 times the face height, where the face
-height is the distance between the forehead and chin points. One value is
-used for the whole clip, the median over its frames.
+The side of the cropped square is 0.63 times the face height, the distance
+between the forehead and chin points, taken as the median over the frames of
+the utterance. One value per utterance is used because the chin is one end
+of the face height: a value per frame would make the crop zoom as the jaw
+opens. The factor 0.63 reproduces the area of the 96-pixel crop of Auto-AVSR
+(measured on 567 clips of the first corpus: median 0.630, 10th to 90th
+percentile 0.605 to 0.667), so weights trained on Auto-AVSR crops remain
+applicable.
 
-- The face height is used rather than the distance between the eyes because
-  the latter shrinks as the head turns. Of the kept clips, 14.8 % show a
-  strongly turned head.
-- One value per clip is used because the chin is one end of the face height:
-  a value per frame would make the crop zoom as the jaw opens.
-
-The factor 0.63 reproduces the area of the 96-pixel crop of Auto-AVSR, so
-that weights trained on Auto-AVSR crops remain applicable. It was measured on
-567 clips: for each, the similarity transform of Auto-AVSR (right eye, left
-eye, nose tip and mouth centre mapped onto its mean face) was estimated, and
-the side of its 96-pixel crop was expressed in source pixels and divided by
-the face height.
-
-| Clips | Number | Median | 10th to 90th percentile |
-|---|---|---|---|
-| All | 567 | 0.630 | 0.605 to 0.667 |
-| Near frontal | 268 | 0.627 | 0.604 to 0.661 |
-| Strongly turned | 116 | 0.641 | 0.614 to 0.677 |
+In the kept clips the face is 167 to 346 pixels tall (5th to 95th
+percentile; median 201), so the mouth region is cut from 105 to 218 source
+pixels and shrunk to 96.
 
 ### 6.4 Cropping and encoding
 
 The square is mapped to 96x96 pixels by an affine transform with bilinear
 interpolation; pixels outside the frame repeat the border. The crop is not
-rotated. Colour is kept. The video is encoded once, with libx264, constant
-rate factor 18, preset medium, yuv420p, 25 frames per second.
-
-The audio stream of the source mp4 is copied into the new mp4 without
-re-encoding. The `.aac` and `.txt` files are copied unchanged.
+rotated. Colour is kept (the loader converts to grey). The video is encoded
+with libx264, constant rate factor 18, yuv420p, 25 frames per second; the
+audio as AAC, 16 kHz mono. Partition-Time Masking is not written into the
+clips; it is applied during training with a new mask every epoch.
 
 ### 6.5 Differences from the Auto-AVSR preprocessing
 
 | | Auto-AVSR | This dataset |
 |---|---|---|
-| Landmark detector | RetinaFace with FAN, or MediaPipe face detection | MediaPipe Face Landmarker |
-| Alignment | similarity transform to a mean face, per frame | none; translation and one scale per clip |
+| Landmark detector | RetinaFace with FAN, or MediaPipe face detection | MediaPipe Face Landmarker, tiled search, 4 faces |
+| Speaker | the one detected face | lip-motion choice among the tracked faces |
+| Alignment | similarity transform to a mean face, per frame | none; translation and one scale per utterance |
 | Smoothing | moving average over 12 frames | Kalman filter with backward pass |
 | Scale reference | eyes, nose and mouth | forehead-to-chin distance |
-| Crop | 96x96, grey | 96x96, colour (converted to grey when loaded) |
+| Crop | 96x96, grey | 96x96, colour (grey when loaded) |
 
-Alignment by similarity transform and contrast-limited adaptive histogram
-equalisation were left out on the basis of earlier experiments by the
-authors **[to be completed by the authors: reference to those experiments]**.
-
-## 7. Partition-Time Masking
-
-Masking is applied to the cropped frames of the training clips.
-
-| Parameter | Value |
-|---|---|
-| Grid | 4x4, cells of 24x24 pixels |
-| Masked span | one span of round(0.2 · T) consecutive frames, at least 1, for a clip of T frames |
-| Position of the span | uniform over the possible positions |
-| Masked cells | 2 of the 16 cells, chosen anew for every frame of the span |
-| Fill | black |
-
-The random choices of a clip are drawn from a generator seeded with the
-CRC-32 of the string `seed/session/clip`, with seed 0. Building the dataset
-again reproduces every mask.
-
-Validation and test clips are not masked, so that error rates describe the
-recognition of unaltered video.
-
-Two consequences of writing the masks into the clips should be stated when
-the dataset is described:
-
-- Every training clip has one mask, the same in every epoch. Masking during
-  training would draw a new mask each time.
-- The masks pass through lossy compression. Inside masked cells the mean
-  level is 0.3 of 255.
-
-## 8. Split
+## 7. Split
 
 | Split | Definition |
 |---|---|
-| Test | all clips of the sessions `2025-2026-birlesim-3` and `video-10` |
-| Validation | the last 5 % of the clips of every other session |
+| Test | all clips of the recordings `2025-2026-birlesim-3` (archive) and `yt-NPJohShU_iw` (YouTube) |
+| Validation | the last 5 % of the kept clips of every other recording |
 | Training | the remaining clips |
 
-The split is made among the clips that passed the transcript checks, before
-the video is read, because it decides which clips are masked.
+Test recordings are whole recordings and validation clips are a contiguous
+block because neighbouring clips come from the same speech: a random split
+would place parts of one speech on both sides. The two test recordings have
+few recurrent transcripts (0.5 % and 0.8 %) and one comes from each source.
 
-Test sessions are whole sessions and validation clips are a contiguous block
-because neighbouring clips come from the same speech: a random split would
-place parts of one sentence on both sides. The two test sessions were chosen
-among those with few recurrent transcripts (0.2 % and 0.5 %).
-
-## 9. Resulting dataset
+## 8. Resulting dataset
 
 | | Training | Validation | Test | Total |
 |---|---|---|---|---|
-| Clips | 140,823 | 7,274 | 6,094 | 154,191 |
-| Hours | 96.0 | 5.0 | 4.4 | 105.4 |
-| Sessions | 31 | 31 | 2 | 33 |
-| Words | 691,911 | 35,556 | 30,934 | 758,401 |
-| Distinct words | 82,018 | 11,516 | 10,411 | 86,861 |
-| Words not seen in training | | 7.8 % | 8.3 % | |
-| Masked | yes | no | no | |
+| Clips | 208,811 | 10,993 | 6,173 | 225,977 |
+| Hours | 207.8 | 10.5 | 6.4 | 224.6 |
+| Recordings | 37 | 37 | 2 | 39 |
+| Words | 1,408,581 | 71,398 | 43,491 | 1,523,470 |
+| Distinct words | 105,994 | 17,591 | 12,888 | 110,591 |
+| Words not seen in training | | 4.3 % | 4.5 % | |
 
 | Per clip | Minimum | 5th percentile | Median | Mean | 95th percentile | Maximum |
 |---|---|---|---|---|---|---|
-| Frames | 12 | 22 | 55 | 61.5 | 117 | 252 |
-| Seconds | 0.48 | 0.88 | 2.20 | 2.46 | 4.68 | 10.08 |
-| Words | | | 4 | 4.92 | 9 | 30 |
+| Frames | 12 | 25 | 78 | 89.5 | 222 | 252 |
+| Seconds | 0.48 | 1.0 | 3.12 | 3.58 | 8.88 | 10.08 |
+| Words | 2 | 2 | 6 | 6.74 | 16 | 35 |
 
-Of the 86,861 distinct words, 50,169 occur once. The dataset contains
-146,999 distinct sentences. Size on disk: 11 GB.
+Of the 110,591 distinct words, 55,434 occur once. The dataset contains
+214,831 distinct sentences. 17.3 % of the kept clips show a strongly turned
+head (yaw proxy above 0.5). Size on disk: 14 GB, 451,954 files.
 
-### By session
+Compared with the first corpus (154,191 clips, 105.4 hours, 4.9 words per
+clip) the dataset has 2.1 times the hours and longer utterances, because the
+utterances are cut at sentence ends and pauses rather than at a fixed length.
 
-| Session | Raw clips | Kept | Kept | Hours | Recurrent or invented | Split |
-|---|---|---|---|---|---|---|
-| 2024-2025-birlesim-72 | 9,247 | 7,704 | 83.3 % | 5.56 | 0.5 % | train, val |
-| 2024-2025-birlesim-73 | 2,370 | 992 | 41.9 % | 0.75 | 37.2 % | train, val |
-| 2024-2025-birlesim-74 | 7,346 | 5,868 | 79.9 % | 4.22 | 0.6 % | train, val |
-| 2024-2025-birlesim-76 | 7,115 | 5,244 | 73.7 % | 3.65 | 8.0 % | train, val |
-| 2024-2025-birlesim-80 | 2,570 | 1,815 | 70.6 % | 1.44 | 6.1 % | train, val |
-| 2024-2025-birlesim-82 | 8,995 | 7,059 | 78.5 % | 4.51 | 1.4 % | train, val |
-| 2024-2025-birlesim-84 | 6,550 | 5,357 | 81.8 % | 3.80 | 0.6 % | train, val |
-| 2024-2025-birlesim-94 | 8,831 | 1,916 | 21.7 % | 1.08 | 70.0 % | train, val |
-| 2024-2025-birlesim-109 | 7,595 | 5,610 | 73.9 % | 4.09 | 6.9 % | train, val |
-| 2024-2025-birlesim-110 | 7,833 | 5,202 | 66.4 % | 3.23 | 13.9 % | train, val |
-| 2025-2026-birlesim-1 | 4,446 | 3,394 | 76.3 % | 2.82 | 2.2 % | train, val |
-| 2025-2026-birlesim-2 | 5,740 | 4,635 | 80.7 % | 3.27 | 0.5 % | train, val |
-| 2025-2026-birlesim-3 | 3,859 | 3,094 | 80.2 % | 2.20 | 0.2 % | test |
-| 2025-2026-birlesim-5 | 3,288 | 2,664 | 81.0 % | 1.84 | 0.5 % | train, val |
-| video-1 | 8,300 | 6,450 | 77.7 % | 4.22 | 4.9 % | train, val |
-| video-2 | 8,088 | 5,589 | 69.1 % | 4.00 | 10.0 % | train, val |
-| video-3 | 8,060 | 5,160 | 64.0 % | 2.70 | 10.8 % | train, val |
-| video-4 | 4,933 | 4,037 | 81.8 % | 2.91 | 0.6 % | train, val |
-| video-5 | 9,312 | 7,558 | 81.2 % | 5.26 | 0.6 % | train, val |
-| video-6 | 2,995 | 1,712 | 57.2 % | 1.21 | 16.4 % | train, val |
-| video-7 | 9,206 | 6,677 | 72.5 % | 4.40 | 8.0 % | train, val |
-| video-8 | 6,521 | 4,405 | 67.6 % | 2.65 | 7.5 % | train, val |
-| video-9 | 7,388 | 5,900 | 79.9 % | 3.80 | 1.2 % | train, val |
-| video-10 | 3,726 | 3,000 | 80.5 % | 2.17 | 0.5 % | test |
-| video-11 | 6,900 | 5,065 | 73.4 % | 3.49 | 5.5 % | train, val |
-| video-12 | 10,236 | 7,970 | 77.9 % | 5.34 | 1.5 % | train, val |
-| video-13 | 7,535 | 4,404 | 58.4 % | 3.18 | 25.2 % | train, val |
-| video-14 | 7,376 | 5,791 | 78.5 % | 3.86 | 2.6 % | train, val |
-| video-15 | 6,071 | 903 | 14.9 % | 0.59 | 79.5 % | train, val |
-| video-16 | 5,947 | 4,711 | 79.2 % | 3.71 | 1.6 % | train, val |
-| video-17 | 7,738 | 5,061 | 65.4 % | 3.26 | 15.6 % | train, val |
-| video-18 | 5,518 | 4,303 | 78.0 % | 2.95 | 4.0 % | train, val |
-| video-19 | 6,456 | 4,941 | 76.5 % | 3.19 | 3.5 % | train, val |
+### By recording
 
-The folders named `video-1` to `video-19` are sessions whose folder does not
-carry a session number **[to be completed by the authors: the sessions these
-correspond to]**.
+Utterances are those found by the transcription. "Recurrent" is the share
+removed by R1 to R4, "no face" the share removed by the video checks.
 
-## 10. Verification
+| Recording | Source | Video h | Utterances | Kept | Kept | Hours | Recurrent | Low conf. | No face | Split |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2024-2025-birlesim-72 | archive | 9.2 | 8,092 | 6,905 | 85.3 % | 6.95 | 0.6 % | 2.0 % | 11.6 % | train, val |
+| 2024-2025-birlesim-73 | archive | 8.7 | 5,938 | 4,762 | 80.2 % | 5.32 | 0.8 % | 2.1 % | 15.3 % | train, val |
+| 2024-2025-birlesim-74 | archive | 8.2 | 6,619 | 5,551 | 83.9 % | 5.70 | 0.3 % | 2.6 % | 12.4 % | train, val |
+| 2024-2025-birlesim-76 | archive | 7.7 | 6,610 | 5,416 | 81.9 % | 5.39 | 0.4 % | 1.8 % | 14.6 % | train, val |
+| 2024-2025-birlesim-80 | archive | 4.4 | 3,546 | 2,912 | 82.1 % | 2.93 | 0.8 % | 2.6 % | 12.3 % | train, val |
+| 2024-2025-birlesim-82 | archive | 9.3 | 8,081 | 6,669 | 82.5 % | 6.35 | 0.7 % | 2.3 % | 13.5 % | train, val |
+| 2024-2025-birlesim-84 | archive | 8.8 | 7,076 | 6,121 | 86.5 % | 6.60 | 0.4 % | 1.8 % | 10.0 % | train, val |
+| 2024-2025-birlesim-94 | archive | 11.3 | 6,948 | 5,204 | 74.9 % | 5.15 | 0.9 % | 2.2 % | 18.8 % | train, val |
+| 2024-2025-birlesim-109 | archive | 11.2 | 8,441 | 6,781 | 80.3 % | 6.88 | 1.2 % | 2.6 % | 13.9 % | train, val |
+| 2024-2025-birlesim-110 | archive | 11.6 | 8,297 | 6,514 | 78.5 % | 6.30 | 0.8 % | 2.6 % | 16.9 % | train, val |
+| 2025-2026-birlesim-1 | archive | 8.5 | 6,415 | 5,099 | 79.5 % | 5.30 | 0.7 % | 2.4 % | 15.5 % | train, val |
+| 2025-2026-birlesim-2 | archive | 6.7 | 5,721 | 4,952 | 86.6 % | 4.90 | 0.7 % | 2.6 % | 9.4 % | train, val |
+| 2025-2026-birlesim-3 | archive | 4.8 | 3,848 | 3,129 | 81.3 % | 3.31 | 0.5 % | 2.5 % | 15.0 % | test |
+| 2025-2026-birlesim-5 | archive | 8.1 | 7,182 | 6,104 | 85.0 % | 5.87 | 0.7 % | 2.9 % | 10.1 % | train, val |
+| 2025-2026-birlesim-7 | archive | 7.9 | 6,402 | 5,493 | 85.8 % | 5.43 | 1.0 % | 1.7 % | 11.0 % | train, val |
+| 2025-2026-birlesim-8 | archive | 8.0 | 6,269 | 5,087 | 81.1 % | 5.08 | 0.6 % | 2.4 % | 14.6 % | train, val |
+| 2025-2026-birlesim-9 | archive | 8.0 | 6,177 | 5,321 | 86.1 % | 5.87 | 0.5 % | 2.0 % | 10.6 % | train, val |
+| 2025-2026-birlesim-10 | archive | 10.4 | 7,688 | 5,900 | 76.7 % | 6.07 | 0.6 % | 3.1 % | 17.3 % | train, val |
+| 2025-2026-birlesim-12 | archive | 7.2 | 5,313 | 4,072 | 76.6 % | 4.35 | 0.5 % | 2.8 % | 19.0 % | train, val |
+| yt-1DIP6Ruvtgg | YouTube | 10.4 | 8,262 | 6,751 | 81.7 % | 6.23 | 0.6 % | 2.0 % | 14.6 % | train, val |
+| yt-45SXDKapxh8 | YouTube | 6.8 | 6,048 | 5,241 | 86.7 % | 4.96 | 0.5 % | 1.8 % | 9.9 % | train, val |
+| yt-Fpah9dtIsFo | YouTube | 7.2 | 5,905 | 4,992 | 84.5 % | 5.16 | 0.4 % | 1.9 % | 12.9 % | train, val |
+| yt-HTCukfIyxoM | YouTube | 7.9 | 7,210 | 6,128 | 85.0 % | 5.63 | 0.7 % | 2.2 % | 11.8 % | train, val |
+| yt-MZtO3ofW7eA | YouTube | 8.6 | 6,775 | 5,796 | 85.5 % | 5.84 | 0.5 % | 1.9 % | 10.9 % | train, val |
+| yt-NPJohShU_iw | YouTube | 4.5 | 3,772 | 3,044 | 80.7 % | 3.08 | 0.8 % | 2.4 % | 15.2 % | test |
+| yt-OPGJ5-ARIC4 | YouTube | 8.2 | 7,189 | 6,231 | 86.7 % | 6.04 | 0.4 % | 1.9 % | 10.2 % | train, val |
+| yt-Pw91kFFU44o | YouTube | 7.2 | 5,582 | 4,458 | 79.9 % | 4.83 | 0.4 % | 3.1 % | 15.4 % | train, val |
+| yt-QEdmcWbgxrg | YouTube | 6.8 | 5,227 | 4,135 | 79.1 % | 4.05 | 0.9 % | 2.6 % | 15.8 % | train, val |
+| yt-S_sCbEZeqCc | YouTube | 11.3 | 11,064 | 9,111 | 82.3 % | 8.25 | 4.4 % | 2.3 % | 10.4 % | train, val |
+| yt-UoHW7olV1LU | YouTube | 11.1 | 9,810 | 7,999 | 81.5 % | 7.68 | 1.0 % | 1.9 % | 15.1 % | train, val |
+| yt-_3u6pzqTuoo | YouTube | 11.3 | 10,070 | 8,970 | 89.1 % | 8.81 | 0.3 % | 2.2 % | 7.9 % | train, val |
+| yt-_8zUPRDIwKM | YouTube | 8.7 | 6,574 | 5,658 | 86.1 % | 6.07 | 0.2 % | 2.3 % | 10.6 % | train, val |
+| yt-fP99G1PONhQ | YouTube | 6.5 | 5,489 | 4,654 | 84.8 % | 4.66 | 0.4 % | 2.1 % | 11.8 % | train, val |
+| yt-hkcAzBtqACE | YouTube | 8.6 | 7,276 | 6,176 | 84.9 % | 5.96 | 0.5 % | 1.9 % | 11.6 % | train, val |
+| yt-io-FZa_APv4 | YouTube | 11.0 | 9,699 | 8,173 | 84.3 % | 7.88 | 0.8 % | 2.7 % | 11.4 % | train, val |
+| yt-l419Asc8yqE | YouTube | 11.4 | 9,960 | 8,479 | 85.1 % | 8.19 | 0.6 % | 2.0 % | 11.9 % | train, val |
+| yt-r7XQxD_fBz4 | YouTube | 10.4 | 8,942 | 7,379 | 82.5 % | 7.29 | 1.1 % | 1.9 % | 13.8 % | train, val |
+| yt-sLfJGTUSnjw | YouTube | 5.8 | 5,251 | 4,200 | 80.0 % | 4.08 | 0.7 % | 2.5 % | 16.1 % | train, val |
+| yt-xZkvTV0J1PI | YouTube | 8.9 | 7,490 | 6,410 | 85.6 % | 6.19 | 0.5 % | 2.8 % | 10.3 % | train, val |
 
-`scripts/verify_dataset.py` compares the dataset with the raw corpus. Checks
-on file content that require decoding were run on 300 random clips of each
-split, 900 in total; all other checks cover every clip.
+The kept share is between 75 % and 89 % in every recording. In the first
+corpus it ranged from 15 % to 83 %, because two recordings were dominated by
+invented transcripts (`ÖZGÜR KARABAT` 6,146 times in one of them); with the
+new transcription the worst recording has 4.4 % recurrent transcripts.
 
-| Check | Scope | Result |
-|---|---|---|
-| The dataset folder holds session folders with mp4, aac and txt files and nothing else | all | passed |
-| Every kept clip is present, no removed clip is present | all | passed |
-| Every clip has its three files | all | passed |
-| Transcript files are byte-identical to the raw corpus | 154,191 | passed |
-| Audio files are byte-identical to the raw corpus | 154,191 | passed |
-| No kept transcript matches R1 or R2; no clip flagged by R3 or R4 is present | all | passed |
-| Test clips are exactly the clips of the two test sessions | all | passed |
-| Only training clips are marked as masked | all | passed |
-| The mp4 has H.264 96x96 video at 25 frames per second as stream 0 and the source audio format as stream 1 | 900 | passed |
-| The number of frames equals that of the raw clip | 900 | passed |
-| The decoded audio is identical, sample for sample, to that of the raw clip | 900 | passed |
-| The video equals the crop recomputed from the raw clip | 900 | mean absolute difference 1.96 of 255, worst clip 2.52 |
-| Masked cells are black and at the positions given by the seed | training clips among the 900 | passed |
-| The mask covers round(0.2 · T) frames | training clips among the 900 | passed |
-| Manifests agree with the clip table; test sessions do not occur in training or validation | all | passed |
+## 9. Verification
 
-The difference between the stored video and the recomputed crop is the loss
-of H.264 compression.
+`scripts/corpus.py verify` checks the built dataset. Checks that decode
+clips were run on 300 random clips of each split, 900 in all; the others
+cover every clip. All passed on 2026-10-22.
 
-## 11. Limitations
+| Check | Scope |
+|---|---|
+| Every kept clip has its mp4 and txt; no other file is in the session folders | all |
+| Every kept clip has a split; test clips are exactly the clips of the two test recordings | all |
+| Each manifest lists exactly the kept clips of its split | all |
+| No clip is masked | all |
+| Kept texts use the alphabet only; both `İ` and `I` occur | all |
+| No kept text is a known invented phrase or an internal loop | all |
+| The mp4 has H.264 square video at 25 frames per second as stream 0 and 16 kHz AAC as stream 1 | 900 |
+| The number of decoded frames equals the clip table | 900 |
+| The decoded audio is as long as the video (up to the AAC block padding) | 900 |
+| The label file's text normalises to the clip table's text | 900 |
+| Every word time of the label file lies within the clip | 900 |
+
+## 10. Limitations
 
 **Transcripts.**
 
 - The transcripts, including those of the test set, are the output of a
   speech recogniser. Error rates measured on this test set are error rates
-  against that recogniser's output, not against what was said. A manually
-  corrected test set would be needed to state absolute accuracy.
+  against that recogniser, not against what was said. A manually corrected
+  test set would be needed to state absolute accuracy.
 - The rules remove transcripts that are implausible. They cannot find a
   transcript that is fluent but wrong.
-- `i` and `ı` share one symbol, so a model trained on this dataset cannot
-  distinguish them, and error rates do not count their confusion.
-- The thresholds of R5, R7 and R8 were not examined, and the examination of
-  R6 rests on a proxy and on reading a small number of clips.
+- The thresholds of R5 and R8 were chosen by judgment and not examined.
 
 **Split.**
 
-- The test sessions are separate recordings, but the same members of
-  parliament speak in many sessions. The test set is not independent of the
-  training set in terms of speakers, and speaker identities are not
-  annotated.
-- Validation clips come from the same sessions as training clips, and
-  therefore from the same speakers and partly the same speeches.
+- The same members of parliament speak in many recordings, so the test set
+  is not independent of the training set in terms of speakers, and speaker
+  identities are not annotated.
+- Validation clips come from the same recordings as training clips.
 
 **Video.**
 
-- Partition-Time Masking is fixed per clip (section 7).
+- The speaker is chosen by lip motion. When a listener moves their mouth
+  more than the speaker over an utterance, the wrong face is cropped; this
+  was not measured.
 - The crop is not rotated, so head roll remains in the data.
 - Landmarks were not checked by hand. A detection that is present but wrong
   is not noticed.
@@ -545,60 +455,55 @@ of H.264 compression.
 **Domain.** All clips show formal speech in one room, recorded by the same
 cameras.
 
-## 12. Reproduction
+## 11. Reproduction
 
 ```bash
-python scripts/extract_raw.py --src <folder with video-*.tar.gz> --dest data/raw
-python scripts/audit_labels.py
-python scripts/build_dataset.py --out data/tr-lrs-clean-ptm \
-    --holdout-sessions 2025-2026-birlesim-3 video-10 --workers 12
-python scripts/build_manifest.py --dataset data/tr-lrs-clean-ptm
-python scripts/verify_dataset.py --dataset data/tr-lrs-clean-ptm --manifests data/manifests --sample 300
+python scripts/corpus.py ingest                      # videos/*.mp4 -> videos/sources.tsv
+python scripts/corpus.py download                    # YouTube sessions below 720p -> 1080p
+python scripts/corpus.py run --dataset dataset/tr-lrs-v3 --workers 7 --gpu-workers 4
+python scripts/corpus.py build --dataset dataset/tr-lrs-v3 --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
+python scripts/corpus.py verify --dataset dataset/tr-lrs-v3
+python scripts/train_tokenizer.py --manifest dataset/tr-lrs-v3-manifests/train.tsv --out-dir dataset/tr-lrs-v3-tokenizer
 ```
 
 | File | Content |
 |---|---|
-| `data/tr-lrs-clean-ptm.settings.json` | crop, masking and split settings |
-| `data/tr-lrs-clean-ptm.clips.tsv` | every raw clip with verdict, split, frames, confidence, detection rate and normalised text |
-| `docs/label_audit.md`, `data/label_audit.tsv` | audit of the transcripts alone, with the most frequent removed and kept sentences |
-| `avsr/data/manifest.py`, `avsr/data/recurrence.py` | the rules and their thresholds |
-| `avsr/preprocess/` | landmarks, smoothing, cropping, masking |
+| `videos/sources.tsv` | every recording: origin, resolution, length, size, checksum |
+| `work/<session>/transcript.json` | the Whisper transcript with word times, confidences and decoder statistics |
+| `work/<session>/segments.tsv` | every utterance with its span, texts, statistics and transcript verdict |
+| `work/<session>/clips.tsv` | the cutter's verdict, frame count, detection rate, faces, face height, yaw and lip motion per utterance |
+| `work/<session>/landmarks/` | the chosen face's landmarks per utterance, for re-cropping |
+| `dataset/tr-lrs-v3.clips.tsv` | every utterance with its verdict and split |
+| `dataset/tr-lrs-v3.settings.json` | the options of each stage and the split |
+| `avsr/corpus/` | the four stages; `avsr/data/{manifest,recurrence}.py` the rules; `avsr/preprocess/` landmarks, smoothing, cropping |
 
 | Software | Version |
 |---|---|
 | Python | 3.13.3 |
-| MediaPipe | 0.10.35 |
-| Face Landmarker model | float16, MD5 `b0e7274907a1644404fef66b28dd6d85` |
+| faster-whisper / CTranslate2 | 1.2.1 / 4.8.3 |
+| MediaPipe | 0.10.35; Face Landmarker float16, MD5 `b0e7274907a1644404fef66b28dd6d85` |
 | PyAV | 16.1.0 (libavcodec 62.11.100) |
 | OpenCV | 4.13.0 |
-| PyTorch | 2.6.0 |
+| ffmpeg, yt-dlp | 7.1.1, 2026.08.19 |
 
-Building took 8.9 hours on a 16-thread CPU with 12 worker processes; face
-landmarks of 33,464 clips were already cached.
-With the landmarks cached, a rebuild takes about an hour and a half.
+Machine: 16 threads, 15 GB of memory, an RTX 2060 (6 GB) for Whisper and
+an Intel UHD graphics unit for four of the seven face-detection workers.
+Transcription took 2026-10-17 to 2026-10-20 (about 1.5 hours of GPU time
+per 10 hours of recording); cutting ran alongside it at about 80 utterances
+per minute and finished on 2026-10-21, including a second pass that recut
+the utterances whose speaker had been found outside the stored region. The
+landmark cache is 2.2 GB; with it, re-cropping the whole corpus with other
+settings needs no face detection.
 
-## 13. References
-
-The bibliographic details below should be checked against the publications
-before they are cited.
+## 12. References
 
 | Used for | Reference |
 |---|---|
 | Baseline preprocessing and model | P. Ma, S. Petridis, M. Pantic, "Visual speech recognition for multiple languages in the wild", Nature Machine Intelligence, 2022 |
 | Baseline preprocessing and model | P. Ma et al., "Auto-AVSR: Audio-visual speech recognition with automatic labels", ICASSP 2023 |
 | Transcripts; compression-ratio test of R2 | A. Radford et al., "Robust speech recognition via large-scale weak supervision", ICML 2023 |
-| Partition-Time Masking | "A novel approach for visual speech recognition using the partition-time masking", Sensors, 2025 (as named in the project notes; authors and volume to be added) |
+| Transcription engine | faster-whisper (SYSTRAN), CTranslate2 |
+| Voice activity filter | Silero VAD |
 | Landmark detection | C. Lugaresi et al., "MediaPipe: A framework for building perception pipelines", 2019; Y. Kartynnik et al., "Real-time facial surface geometry from monocular video on mobile GPUs", 2019 |
-| Kalman filter | R. E. Kalman, "A new approach to linear filtering and prediction problems", 1960 |
-| Backward pass | H. E. Rauch, F. Tung, C. T. Striebel, "Maximum likelihood estimates of linear dynamic systems", 1965 |
-
-## 14. To be completed by the authors
-
-| Item | Section |
-|---|---|
-| Whisper model, version and decoding settings | 2 |
-| How the recordings were segmented into clips | 2 |
-| How faces were detected and cropped to 224x224 | 2 |
-| Which sessions the folders `video-1` to `video-19` are | 9 |
-| Reference to the earlier experiments on alignment and histogram equalisation | 6.5 |
-| Authors and volume of the Partition-Time Masking paper | 13 |
+| Kalman filter and backward pass | R. E. Kalman, 1960; H. E. Rauch, F. Tung, C. T. Striebel, 1965 |
+| Partition-Time Masking (applied during training) | "A novel approach for visual speech recognition using the partition-time masking", Sensors, 2025 |

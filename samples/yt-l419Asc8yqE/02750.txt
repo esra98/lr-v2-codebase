@@ -1,0 +1,16 @@
+Text:  Kentsel dönüşüm adı altında yoksulun riskli evini yenilemek yerine rantı yüksek bölgelerde lüks rezidanslar dikiliyor.
+Kentsel 0.040 0.620 0.997
+dönüşüm 0.620 1.180 0.999
+adı 1.180 1.340 1.000
+altında 1.340 1.860 1.000
+yoksulun 1.860 3.120 0.991
+riskli 3.120 4.020 0.994
+evini 4.020 4.360 1.000
+yenilemek 4.360 4.960 1.000
+yerine 4.960 5.500 1.000
+rantı 5.500 6.400 0.965
+yüksek 6.400 6.820 1.000
+bölgelerde 6.820 7.540 1.000
+lüks 7.540 8.400 1.000
+rezidanslar 8.400 9.500 0.997
+dikiliyor. 9.500 9.920 0.987

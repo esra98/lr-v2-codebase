@@ -1,0 +1,5 @@
+Text:  Buradan şimdiden işçinin, emekçinin
+Buradan 0.040 0.780 0.993
+şimdiden 0.780 1.400 0.900
+işçinin, 1.400 2.280 0.994
+emekçinin 2.380 2.940 0.998

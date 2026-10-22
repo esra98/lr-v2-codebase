@@ -1,0 +1,5 @@
+Text:  Ülkemizin hak ettiği halkın
+Ülkemizin 0.040 0.780 0.998
+hak 0.780 1.160 0.985
+ettiği 1.160 1.580 0.992
+halkın 1.580 2.040 0.991

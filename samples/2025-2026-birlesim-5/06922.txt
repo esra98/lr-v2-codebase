@@ -1,0 +1,8 @@
+Text:  milletvekilimiz sevgili Aykut Erdoğdu ve sağlık sorunlarıyla
+milletvekilimiz 0.040 0.740 0.992
+sevgili 0.740 1.100 0.960
+Aykut 1.100 1.380 0.993
+Erdoğdu 1.380 1.820 0.979
+ve 1.820 2.320 0.982
+sağlık 2.320 2.800 0.999
+sorunlarıyla 2.800 3.380 0.998

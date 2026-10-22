@@ -41,12 +41,12 @@ model:
 tokenizer:
   type: unigram
   vocab_size: 1000
-  model_path: data/tokenizer/unigram1000.model
+  model_path: dataset/tr-lrs-v3-tokenizer/unigram1000.model
 
 data:
-  root: data/tr-lrs-clean-ptm
-  manifests: data/manifests
-  ptm_in_clips: true
+  root: dataset/tr-lrs-v3
+  manifests: dataset/tr-lrs-v3-manifests
+  ptm_in_clips: false
   max_frames_per_clip: 300
   # 1800 frames per batch is the Auto-AVSR value. Measure what the GPU holds
   # with scripts/benchmark_memory.py and keep (frames per batch) x

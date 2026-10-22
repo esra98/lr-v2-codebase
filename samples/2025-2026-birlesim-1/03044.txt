@@ -1,0 +1,8 @@
+Text:  Çünkü karşımızda sadece bir yargı sistemi yok,
+Çünkü 0.040 0.360 0.999
+karşımızda 0.360 1.120 0.946
+sadece 1.120 1.360 0.985
+bir 1.360 1.660 0.996
+yargı 1.660 2.080 0.998
+sistemi 2.080 2.560 0.998
+yok, 2.560 3.500 0.757

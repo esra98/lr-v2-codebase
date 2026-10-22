@@ -1,24 +1,27 @@
 """Turkish transcript normalisation.
 
-The TR-LRS transcripts are upper-cased ASR output. The upper-casing was done
-without Turkish locale rules, so both ``i`` and ``ı`` ended up as ``I`` while
-``İ`` only survives where the ASR itself emitted a capital dotted I. That makes
-the dotted/dotless distinction unrecoverable from the labels alone, so by
-default both are merged into a single symbol ``I`` to keep targets consistent.
+Transcripts are upper-cased with Turkish casing rules (``i`` becomes ``İ``,
+``ı`` becomes ``I``), so the dotted and dotless I stay distinct and the
+alphabet has the 29 Turkish letters plus Q, W, X for foreign words.
+
+The first TR-LRS corpus (2026-09) had been upper-cased without those rules,
+which merged both letters into ``I``. ``merge_dotted_i=True`` reproduces that
+alphabet for work on the old clips; new corpora are cut from the Whisper
+output in its original casing and do not need it.
 """
 
 import re
 import unicodedata
 
-# Canonical alphabet after normalisation (upper-case, I/İ merged by default).
-TURKISH_ALPHABET = "ABCÇDEFGĞHIJKLMNOÖPRSŞTUÜVYZ"
+# Canonical alphabet after normalisation (upper-case, Turkish casing).
+TURKISH_ALPHABET = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
 FOREIGN_LETTERS = "QWX"
 
 _CIRCUMFLEX = str.maketrans({"Â": "A", "Î": "I", "Û": "U", "â": "a", "î": "i", "û": "u"})
 
-_ONES = ["", "BIR", "IKI", "ÜÇ", "DÖRT", "BEŞ", "ALTI", "YEDI", "SEKIZ", "DOKUZ"]
-_TENS = ["", "ON", "YIRMI", "OTUZ", "KIRK", "ELLI", "ALTMIŞ", "YETMIŞ", "SEKSEN", "DOKSAN"]
-_SCALES = [(10**12, "TRILYON"), (10**9, "MILYAR"), (10**6, "MILYON"), (10**3, "BIN")]
+_ONES = ["", "BİR", "İKİ", "ÜÇ", "DÖRT", "BEŞ", "ALTI", "YEDİ", "SEKİZ", "DOKUZ"]
+_TENS = ["", "ON", "YİRMİ", "OTUZ", "KIRK", "ELLİ", "ALTMIŞ", "YETMİŞ", "SEKSEN", "DOKSAN"]
+_SCALES = [(10**12, "TRİLYON"), (10**9, "MİLYAR"), (10**6, "MİLYON"), (10**3, "BİN")]
 
 _NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)*")
 _APOSTROPHES = "'’‘`´"
@@ -40,7 +43,7 @@ def _below_thousand(n):
 
 
 def number_to_words(n):
-    """Spell a non-negative integer in Turkish (upper-case, I/İ merged)."""
+    """Spell a non-negative integer in Turkish (upper-case, Turkish casing)."""
     n = int(n)
     if n == 0:
         return "SIFIR"
@@ -70,7 +73,7 @@ def _spell_number_token(token):
         integer = integer.replace(".", "")
         fraction = fraction.replace(".", "").replace(",", "")
         if integer.isdigit() and fraction.isdigit():
-            return f"{number_to_words(integer)} VIRGÜL {number_to_words(fraction)}"
+            return f"{number_to_words(integer)} VİRGÜL {number_to_words(fraction)}"
         token = integer + fraction
     parts = token.split(".")
     # Dots followed by exactly three digits are thousands separators (1.250.000).
@@ -93,7 +96,12 @@ def spell_numbers(text):
     return text.replace("\u0000", " ")
 
 
-def normalize_text(text, merge_dotted_i=True, spell_digits=True, keep_foreign=True):
+def fold_dotted_i(text):
+    """Map ``İ`` to ``I``, the alphabet of the first corpus (see module docstring)."""
+    return text.replace("İ", "I")
+
+
+def normalize_text(text, merge_dotted_i=False, spell_digits=True, keep_foreign=True):
     """Normalise a raw transcript to the canonical training alphabet.
 
     Returns an upper-case string containing only alphabet letters and single
@@ -106,12 +114,10 @@ def normalize_text(text, merge_dotted_i=True, spell_digits=True, keep_foreign=Tr
     # Turkish-aware upper-casing, done before str.upper() can mangle it.
     text = text.replace("i", "İ").replace("ı", "I").upper()
     if merge_dotted_i:
-        text = text.replace("İ", "I")
+        text = fold_dotted_i(text)
     for ch in _APOSTROPHES:
         text = text.replace(ch, "")
     allowed = set(TURKISH_ALPHABET)
-    if not merge_dotted_i:
-        allowed.add("İ")
     if keep_foreign:
         allowed.update(FOREIGN_LETTERS)
     text = "".join(ch if ch in allowed else " " for ch in text)

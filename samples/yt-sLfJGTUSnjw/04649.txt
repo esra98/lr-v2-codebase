@@ -1,0 +1,12 @@
+Text:  14 ayrı kanunda değişiklik öngören 19 maddelik torba kanunla karşımıza geldiniz.
+14 0.040 0.560 0.865
+ayrı 0.560 1.320 0.998
+kanunda 1.320 1.840 0.998
+değişiklik 1.840 3.080 1.000
+öngören 3.080 3.540 0.989
+19 3.540 4.380 0.995
+maddelik 4.380 5.340 0.999
+torba 5.340 5.720 0.997
+kanunla 5.720 6.240 0.881
+karşımıza 6.240 6.820 0.999
+geldiniz. 6.820 7.300 1.000

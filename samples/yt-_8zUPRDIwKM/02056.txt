@@ -1,0 +1,14 @@
+Text:  Ancak şunu açık bir şekilde ifade etmek isterim ki, Türkiye güçlü ekonomik altyapısı,
+Ancak 0.040 0.780 0.997
+şunu 0.780 1.600 0.995
+açık 1.600 1.840 1.000
+bir 1.840 2.000 1.000
+şekilde 2.000 2.240 1.000
+ifade 2.240 2.520 0.998
+etmek 2.520 2.720 0.999
+isterim 2.720 3.160 0.999
+ki, 3.160 3.320 0.999
+Türkiye 3.380 4.140 0.997
+güçlü 4.140 5.140 0.972
+ekonomik 5.140 5.660 0.999
+altyapısı, 5.660 6.220 0.994

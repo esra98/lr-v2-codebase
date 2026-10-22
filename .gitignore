@@ -5,17 +5,11 @@ __pycache__/
 .pytest_cache/
 .pytest_tmp/
 
-# Reference material, kept locally
-/papers/
-/reference-codebase/
-/prompt.text
-
 # Data, weights and runs (top-level folders only: avsr/data/ is code)
 /data/
 /exp/
 /logs/
 /pretrained/
-/upload/
 *.tmp.*
 
 # Large binaries; they travel with the data (docs/deployment.md)
@@ -25,3 +19,10 @@ __pycache__/
 *.ckpt
 *.tar
 *.mp4
+# ... except the 50 sample clips
+!/samples/**/*.mp4
+
+# Recordings, per-session pipeline state and the clips (docs/dataset_construction.md)
+/videos/
+/work/
+/dataset/

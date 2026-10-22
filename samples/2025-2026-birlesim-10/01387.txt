@@ -1,0 +1,4 @@
+Text:  Durum bir felaket
+Durum 0.040 1.120 0.996
+bir 1.120 1.260 0.987
+felaket 1.260 1.880 0.987

@@ -1,8 +1,17 @@
 # Findings
 
 Everything here was measured on this machine (RTX 2060, 6 GB) between
-2026-09-27 and 2026-09-29. No A/B experiment has been run yet, so there is no
-result on which of the optional techniques helps.
+2026-09-27 and 2026-09-29, on the first corpus (`data/tr-lrs-clean-ptm`).
+No A/B experiment has been run yet, so there is no result on which of the
+optional techniques helps.
+
+**Note (2026-10-22).** The corpus was rebuilt from the full recordings as
+`dataset/tr-lrs-v3` (`docs/dataset_construction.md`). The dataset sections
+below describe the first corpus; the model, memory and fine-tuning findings
+do not depend on it, except that the vocabulary and tokenizer changed (the
+new alphabet has both `İ` and `I`), so fine-tuned checkpoints from the first
+corpus cannot be evaluated on the new test set without retraining their
+output layers.
 
 ## Dataset
 

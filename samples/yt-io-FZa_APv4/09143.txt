@@ -1,0 +1,14 @@
+Text:  aynı kararlılıkla bu dönüşümü yapacağız ve orada İstanbul hemşehrilerimizin yanında olmaya devam edeceğiz.
+aynı 0.040 0.600 1.000
+kararlılıkla 0.600 1.460 1.000
+bu 1.460 2.080 0.992
+dönüşümü 2.080 2.540 1.000
+yapacağız 2.540 3.420 1.000
+ve 3.420 3.900 0.924
+orada 3.900 4.900 0.996
+İstanbul 4.900 5.480 0.974
+hemşehrilerimizin 5.480 6.700 0.904
+yanında 6.700 7.520 1.000
+olmaya 7.520 7.900 1.000
+devam 7.900 8.660 1.000
+edeceğiz. 8.660 9.220 1.000

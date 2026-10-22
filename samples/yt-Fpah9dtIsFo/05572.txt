@@ -1,0 +1,11 @@
+Text:  kayıt dışılıkla mücadele edilmesi, vergi dışında kalan alanların kapsama alınması,
+kayıt 0.040 0.620 0.997
+dışılıkla 0.620 1.140 0.994
+mücadele 1.140 1.720 1.000
+edilmesi, 1.720 2.280 1.000
+vergi 2.480 3.220 1.000
+dışında 3.220 3.600 1.000
+kalan 3.600 4.000 1.000
+alanların 4.000 4.540 1.000
+kapsama 4.540 5.140 1.000
+alınması, 5.140 5.720 1.000

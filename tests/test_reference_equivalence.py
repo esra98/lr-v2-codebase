@@ -15,7 +15,10 @@ from avsr.config import PROJECT_ROOT, load_config
 from avsr.models.e2e import AVSRModel
 from avsr.models.pretrained import load_pretrained
 
-REFERENCE = os.path.join(PROJECT_ROOT, "reference-codebase", "auto_avsr")
+# The original Auto-AVSR code is kept outside the repository.
+REFERENCE = os.environ.get(
+    "AUTO_AVSR_REFERENCE", os.path.expanduser("~/Desktop/archive/auto-avsr-reference-codebase/auto_avsr")
+)
 CHECKPOINTS = {
     "video": os.path.join(PROJECT_ROOT, "pretrained", "vsr_trlrs2lrs3vox2avsp_base.pth"),
     "audio": os.path.join(PROJECT_ROOT, "pretrained", "asr_trlrs3vox2_base.pth"),

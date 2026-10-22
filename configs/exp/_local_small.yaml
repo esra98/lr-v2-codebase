@@ -11,7 +11,7 @@ model:
     hidden: 2048
 tokenizer:
   vocab_size: 500
-  model_path: data/tokenizer/unigram500.model
+  model_path: dataset/tr-lrs-v3-tokenizer/unigram500.model
 data:
   max_frames_per_clip: 300
   max_frames_per_batch: 1200

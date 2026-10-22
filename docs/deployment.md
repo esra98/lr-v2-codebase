@@ -5,6 +5,14 @@ how to start, watch, resume and evaluate the full fine-tuning run.
 
 What was rehearsed locally and what was not is stated in section 10.
 
+**Note (2026-10-22).** Written for the first corpus. The current dataset is
+`dataset/tr-lrs-v3` with `dataset/tr-lrs-v3-manifests/`,
+`dataset/tr-lrs-v3-tokenizer/`, `dataset/tr-lrs-v3.clips.tsv` and
+`dataset/tr-lrs-v3.settings.json` next to it (14 GB, 451,954 files, no
+`.aac` side files); `configs/base.yaml` already points there, so the
+`data.root` and `data.manifests` overrides below are only needed when the
+dataset is unpacked elsewhere. Read `data/` below as `dataset/`.
+
 ## 1. Overview
 
 | Step | Where | Time |

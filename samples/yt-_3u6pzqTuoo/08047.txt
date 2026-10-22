@@ -1,0 +1,8 @@
+Text:  zincirlerinin kırılması bu toprakların, bu mirasın, bu
+zincirlerinin 0.040 0.780 0.974
+kırılması 0.780 1.400 0.993
+bu 1.400 2.000 0.766
+toprakların, 2.000 2.800 0.979
+bu 2.900 3.220 0.998
+mirasın, 3.220 3.880 0.992
+bu 4.020 4.260 0.999

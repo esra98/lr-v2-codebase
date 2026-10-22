@@ -13,8 +13,8 @@ from avsr.text.tokenizer import SentencePieceTokenizer, train_sentencepiece  # n
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", default="data/manifests/train.tsv")
-    parser.add_argument("--out-dir", default="data/tokenizer")
+    parser.add_argument("--manifest", default="dataset/tr-lrs-v3-manifests/train.tsv")
+    parser.add_argument("--out-dir", default="dataset/tr-lrs-v3-tokenizer")
     parser.add_argument("--vocab-size", type=int, default=1000)
     parser.add_argument("--type", default="unigram", choices=["unigram", "bpe"])
     args = parser.parse_args()

@@ -1,0 +1,5 @@
+Text:  Ha kanun böyle diyebilirsiniz.
+Ha 0.040 0.100 0.587
+kanun 0.100 0.560 0.953
+böyle 0.560 0.680 1.000
+diyebilirsiniz. 0.680 1.440 1.000

@@ -1,0 +1,6 @@
+Text:  Kurtulmuş 'a teşekkürlerimi arz ediyor.
+Kurtulmuş 0.040 0.700 0.996
+'a 0.700 0.840 0.973
+teşekkürlerimi 0.840 2.060 0.994
+arz 2.060 2.260 0.999
+ediyor. 2.260 2.480 0.991

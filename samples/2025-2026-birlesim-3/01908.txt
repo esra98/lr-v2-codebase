@@ -1,0 +1,14 @@
+Text:  Çünkü bu mesele yalnızca bir coğrafyanın, yalnızca bir halkın, bir dinin meselesi değildir.
+Çünkü 0.040 0.530 1.000
+bu 0.530 0.770 1.000
+mesele 0.770 1.150 1.000
+yalnızca 1.150 1.650 1.000
+bir 1.650 1.810 1.000
+coğrafyanın, 1.810 2.530 1.000
+yalnızca 2.590 3.510 1.000
+bir 3.510 3.690 1.000
+halkın, 3.690 4.270 1.000
+bir 4.370 4.990 1.000
+dinin 4.990 5.430 1.000
+meselesi 5.430 5.910 1.000
+değildir. 5.910 6.290 1.000

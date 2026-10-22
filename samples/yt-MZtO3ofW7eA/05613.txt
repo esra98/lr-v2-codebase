@@ -1,0 +1,9 @@
+Text:  Kendi halinde doğal alanında insandan kaçan canlılardan ne
+Kendi 0.040 0.920 0.833
+halinde 0.920 1.500 0.992
+doğal 1.500 2.360 0.573
+alanında 2.360 2.800 0.886
+insandan 2.800 3.800 0.982
+kaçan 3.800 4.520 0.999
+canlılardan 4.520 5.500 0.991
+ne 5.500 6.120 0.997

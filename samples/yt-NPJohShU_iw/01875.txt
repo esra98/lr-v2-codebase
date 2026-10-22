@@ -1,0 +1,7 @@
+Text:  Önce Hindistan'dan Avrupa 'ya uzanan o
+Önce 0.040 0.680 0.998
+Hindistan'dan 0.680 1.500 0.983
+Avrupa 1.500 1.860 0.972
+'ya 1.860 1.960 0.991
+uzanan 1.960 2.240 0.995
+o 2.240 2.420 0.992

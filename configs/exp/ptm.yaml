@@ -1,18 +1,13 @@
 # Does Partition-Time Masking help on top of ordinary time masking?
-#
-# Needs a second dataset without masks, built from the same clips:
-#   python scripts/build_dataset.py --out data/ab/no-ptm --no-ptm \
-#       --holdout-sessions 2025-2026-birlesim-3 video-10
 name: ptm
 description: >
-  No PTM, PTM drawn anew in every epoch, and PTM written into the clips
-  (one fixed mask per clip). Validation clips are unmasked in all arms.
+  No PTM versus PTM drawn anew in every epoch. Validation clips are never
+  masked.
 control: no_ptm
 seeds: [1, 2, 3]
 metrics: [val/cer, val/wer, val/loss]
 files: [configs/exp/_local_video.yaml]
 overrides: []
 arms:
-  no_ptm: [data.root=data/ab/no-ptm, data.ptm_in_clips=false, augment.video.ptm.enabled=false]
-  ptm_each_epoch: [data.root=data/ab/no-ptm, data.ptm_in_clips=false, augment.video.ptm.enabled=true]
-  ptm_in_clips: [data.root=data/tr-lrs-clean-ptm, data.ptm_in_clips=true]
+  no_ptm: [augment.video.ptm.enabled=false]
+  ptm_each_epoch: [augment.video.ptm.enabled=true]

@@ -1,0 +1,9 @@
+Text:  yeniden inşa etmek yerine sorunları erteleyen ve yerinde
+yeniden 0.040 0.760 0.999
+inşa 0.760 1.220 0.996
+etmek 1.220 1.440 0.996
+yerine 1.440 2.020 0.999
+sorunları 2.020 2.880 0.968
+erteleyen 2.880 3.540 0.909
+ve 3.540 3.980 0.994
+yerinde 3.980 4.380 0.972

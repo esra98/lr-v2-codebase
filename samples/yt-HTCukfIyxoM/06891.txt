@@ -1,0 +1,8 @@
+Text:  dosya yargının nasıl sistematik biçimde siyasallaştığını görmek
+dosya 0.040 0.600 0.990
+yargının 0.600 1.120 0.988
+nasıl 1.120 1.840 0.991
+sistematik 1.840 2.820 0.989
+biçimde 2.820 3.280 0.995
+siyasallaştığını 3.280 4.540 0.994
+görmek 4.540 5.560 0.981

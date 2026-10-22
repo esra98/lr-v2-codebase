@@ -1,0 +1,5 @@
+Text:  ülkeye sosyal devlet diyemezdiniz.
+ülkeye 0.040 0.500 0.993
+sosyal 0.500 0.900 0.996
+devlet 0.900 1.320 0.997
+diyemezdiniz. 1.320 1.960 0.894

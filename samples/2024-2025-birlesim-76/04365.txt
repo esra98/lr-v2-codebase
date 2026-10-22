@@ -1,0 +1,6 @@
+Text:  Bahçeli 'nin talimatları doğrultusunda çiftçilerimizin
+Bahçeli 0.040 0.520 0.999
+'nin 0.520 0.680 1.000
+talimatları 0.680 1.460 1.000
+doğrultusunda 1.460 2.280 1.000
+çiftçilerimizin 2.280 4.020 0.968

@@ -1,0 +1,7 @@
+Text:  Işçiyi ve emekçiyi aynı zamanda asgari
+Işçiyi 0.040 0.820 0.950
+ve 0.820 1.580 0.969
+emekçiyi 1.580 2.560 0.987
+aynı 2.560 3.240 0.886
+zamanda 3.240 3.860 0.999
+asgari 3.860 4.560 0.997

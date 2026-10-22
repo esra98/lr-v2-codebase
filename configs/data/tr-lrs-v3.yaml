@@ -1,0 +1,14 @@
+# The corpus cut from the full recordings with scripts/corpus.py (October 2026).
+# Masks are not in the clips, so Partition-Time Masking runs during training.
+data:
+  root: dataset/tr-lrs-v3
+  manifests: dataset/tr-lrs-v3-manifests
+  ptm_in_clips: false
+
+augment:
+  video:
+    ptm:
+      enabled: true
+
+tokenizer:
+  model_path: dataset/tr-lrs-v3-tokenizer/unigram1000.model

@@ -1,0 +1,7 @@
+Text:  gerekir ki Lübnan'daki Birleşmiş Milletler Barış
+gerekir 0.040 0.460 0.969
+ki 0.460 0.640 0.986
+Lübnan'daki 0.640 2.120 0.950
+Birleşmiş 2.120 2.620 0.960
+Milletler 2.620 3.320 0.996
+Barış 3.320 4.020 0.719

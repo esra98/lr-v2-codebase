@@ -1,0 +1,7 @@
+Text:  tahribat hayvancılığın bitmesinin sebebi seni oraya
+tahribat 0.040 0.560 0.993
+hayvancılığın 0.560 1.580 0.913
+bitmesinin 1.580 2.320 0.997
+sebebi 2.320 3.220 0.994
+seni 3.220 4.080 0.851
+oraya 4.080 4.460 0.968

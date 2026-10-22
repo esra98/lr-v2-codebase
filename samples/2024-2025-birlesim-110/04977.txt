@@ -1,0 +1,13 @@
+Text:  hemen hemen çevremizde her bölgenin büyük çatışmalar, gerilimler içerisinde bulunduğu bir dönemde,
+hemen 0.040 0.460 0.996
+hemen 0.460 0.720 1.000
+çevremizde 0.720 1.480 1.000
+her 1.480 2.140 0.999
+bölgenin 2.140 2.780 1.000
+büyük 2.780 3.040 1.000
+çatışmalar, 3.040 3.760 0.999
+gerilimler 3.760 4.240 0.999
+içerisinde 4.240 4.800 1.000
+bulunduğu 4.800 5.260 1.000
+bir 5.260 5.400 1.000
+dönemde, 5.400 5.940 1.000

@@ -20,25 +20,40 @@ three tasks.
 ## Layout
 
 ```
+videos/                        full-length recordings, one per session, and sources.tsv
+work/<session>/                per-session pipeline state: transcript.json, segments.tsv,
+                               clips.tsv, landmarks/, status.json (all resumable)
+dataset/<name>/<session>/      the clips: <utt>.mp4 (96x96 mouth + 16 kHz audio), <utt>.txt
+dataset/<name>.clips.tsv       every utterance with its verdict and split
+dataset/<name>-manifests/      train / val / test manifests
 avsr/
+  corpus/       ingest, transcribe, segment, cut, build: recordings -> dataset
   text/         Turkish normalisation, label parsing, tokenizers
-  preprocess/   landmarks, trajectory smoothing, mouth cropping, masking, audio/video I/O
-  data/         label cleaning, manifests, augmentation, batching
+  preprocess/   landmarks, trajectory smoothing, mouth cropping, audio/video I/O
+  data/         label rules, clip table, manifests, augmentation, batching
   models/       model, Conformer encoder extensions, pretrained-weight loading
   decoding/     joint CTC/attention beam search
   training/     Lightning modules, schedule, weight averaging
   espnet/       Transformer/Conformer building blocks from Auto-AVSR (Apache 2.0)
 configs/
   base.yaml     every option, with defaults
+  data/         dataset presets
   model/        size presets: tiny, small, base
   exp/          A/B experiment definitions
 scripts/        command-line entry points (see below)
 tests/          unit and end-to-end tests
-docs/           literature notes and findings
+docs/           how the corpus was built, literature notes, findings
+samples/        50 clips of the dataset with their labels, to see the format
 ```
 
-`reference-codebase/` and `papers/` are reference material and are never
-imported by the training code. The original dataset folder is only ever read.
+`videos/`, `work/`, `dataset/`, `exp/` and `pretrained/` are not in git.
+
+The current dataset is `dataset/tr-lrs-v3` (October 2026): 39 recordings,
+225,977 clips, 224.6 hours, built as described in
+`docs/dataset_construction.md`. The first corpus (September 2026, built
+from 224x224 face clips with the dotted and dotless I merged) and the
+scripts that built it are tagged `v2-dataset-2026-09-28` and described in
+`docs/archive/`.
 
 ## Setup
 
@@ -48,151 +63,105 @@ python3 -m venv --system-site-packages .venv      # reuses the system PyTorch
 .venv/bin/python -m pytest                          # about 10 minutes
 ```
 
-`assets/face_landmarker.task` (MediaPipe, for building datasets) and
-`assets/babble_noise.wav` (for audio augmentation) are not in git; they
-travel with the data (`docs/deployment.md`). The landmark model is
-downloaded from
+`assets/face_landmarker.task` (MediaPipe) and `assets/babble_noise.wav`
+(audio augmentation) are not in git. The landmark model comes from
 `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task`.
+Building the corpus also needs `ffmpeg`, `yt-dlp` (2026.08 or later, with
+`node` as its JavaScript runtime) and `faster-whisper`.
 
-## Pipeline
+## From recordings to a dataset
+
+A session is one recording: an assembly session (`2024-2025-birlesim-72.mp4`)
+or a YouTube upload (`yt-<id>.mp4`). Everything is driven by one script:
 
 ```bash
-# 1. Copy sessions out of the read-only source folder
-python scripts/extract_raw.py --src "/path/to/tr-lrs" --dest data/raw
+# 1. Register the recordings: resolution, length, checksum -> videos/sources.tsv
+python scripts/corpus.py ingest
 
-# 2. Audit the transcripts (labels only, about a minute)
-python scripts/audit_labels.py
+# 2. Fetch YouTube sessions at up to 1080p (resumable, replaces smaller files)
+python scripts/corpus.py download --ids fP99G1PONhQ ...
 
-# 3. Build the dataset: clean, crop, mask
-python scripts/build_dataset.py --out data/tr-lrs-clean-ptm \
-    --holdout-sessions 2025-2026-birlesim-3 video-10 --workers 12
+# 3. Transcribe, segment and cut, session by session (NVIDIA GPU for Whisper; the
+#    face detector runs on the Intel GPU for --gpu-workers of the --workers, CPU for the rest)
+python scripts/corpus.py run --dataset dataset/tr-lrs-v3 --workers 7 --gpu-workers 4
 
-# 4. Check the dataset against the source
-python scripts/build_manifest.py --dataset data/tr-lrs-clean-ptm
-python scripts/verify_dataset.py --dataset data/tr-lrs-clean-ptm --manifests data/manifests
+# 4. Clip table, split and manifests; then check the result
+python scripts/corpus.py build --dataset dataset/tr-lrs-v3 --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
+python scripts/corpus.py verify --dataset dataset/tr-lrs-v3
 
-# 5. Tokenizer
-python scripts/train_tokenizer.py --vocab-size 1000
-
-# 6. Choose a batch size that fits the GPU
+# 5. Tokenizer, batch size, training, evaluation
+python scripts/train_tokenizer.py --manifest dataset/tr-lrs-v3-manifests/train.tsv --out-dir dataset/tr-lrs-v3-tokenizer
 python scripts/benchmark_memory.py -c configs/model/small.yaml model.modality=video
-
-# 7. Train
 python scripts/train.py -c configs/model/small.yaml model.modality=video exp_name=vsr_small
-
-# 8. Evaluate with beam search, averaging the kept checkpoints
 python scripts/evaluate.py --run exp/vsr_small --average 10
 ```
 
-Every step can be interrupted and re-run; finished work is skipped.
+`run` is `transcribe`, `segment` and `cut`, which can also be called one at a
+time; `status` lists what is done per session. Every stage is resumable:
+transcription per 20-minute chunk, cutting per utterance, and a stage runs
+again only when its inputs or options changed (`work/<session>/status.json`).
+After a download, run `ingest` again before `run`: a session whose
+`sources.tsv` entry is still below 720p is transcribed but not cut.
+`cut --retry-errors` cuts only the utterances whose verdict is `error`.
 
-Any option in `configs/base.yaml` can be overridden with `key=value` on the
-command line or collected in a YAML file passed with `-c`. Unknown keys are
-rejected.
+| Stage | Input | Output | What it does |
+|---|---|---|---|
+| transcribe | `videos/<s>.mp4` | `work/<s>/transcript.json` | `faster-whisper large-v3` with word times and confidences, in Whisper's own casing; `no_speech_prob`, `avg_logprob`, `compression_ratio` per segment |
+| segment | transcript | `work/<s>/segments.tsv` | utterances: cut at sentence ends and pauses over 0.4 s, at most 10 s (split at the longest pause), at least 2 words; the text rules below give each one a verdict |
+| cut | video + segments | `dataset/<name>/<s>/`, `work/<s>/clips.tsv`, `work/<s>/landmarks/` | one sequential decode; frames nearest the 25 fps grid; up to 4 faces found by a tiled search (MediaPipe alone misses 200 to 300 px faces in a 1080p frame), tracked through the clip, and the **speaker chosen by lip motion**; 96x96 mouth crop with the utterance's 16 kHz mono audio in one mp4 |
+| build | all `clips.tsv` | clip table, manifests | whole held-out sessions as the test set, the last 5 % of every other session as validation |
 
-## The dataset
-
-The dataset has the layout of the source corpus, so it can be read by
-anything that reads the source:
+### The clips
 
 ```
-data/tr-lrs-clean-ptm/
+dataset/tr-lrs-v3/
   2024-2025-birlesim-72/
-    00000.mp4     96x96 mouth crop (stream 0) and the original audio (stream 1)
-    00000.aac     original audio, copied unchanged
-    00000.txt     original transcript with word times, copied unchanged
-    00003.mp4     clips keep their numbers; left-out clips leave gaps
-    ...
-  video-1/
-  ...
+    00000.mp4     96x96 mouth crop at 25 fps (stream 0), 16 kHz mono AAC (stream 1)
+    00000.txt     Text: line in Whisper's casing, then WORD start end confidence per word
+    00003.mp4     utterance numbers are those of segments.tsv; rejected ones leave gaps
 ```
 
-It differs from the source in three ways:
-
-| | Source | Dataset |
-|---|---|---|
-| Clips | all | those that pass the cleaning (see below) |
-| Video | 224x224 face | 96x96 mouth crop |
-| Masking | none | Partition-Time Masking in the training clips |
-
-Two files are written *next to* the folder, not into it:
-
-| File | Content |
-|---|---|
-| `data/tr-lrs-clean-ptm.clips.tsv` | every source clip with its verdict, split, frame count and normalised text |
-| `data/tr-lrs-clean-ptm.settings.json` | crop, masking and split settings the dataset was built with |
-
-The training code reads the clips from the dataset folder and takes the
-split, the clip lengths and the normalised text from `data/manifests/`.
-
-### Design choices
-
-| Choice | Decision | Reason |
-|---|---|---|
-| Audio format | original AAC, inside the mp4 | re-encoding to FLAC doubles the size and cannot add quality; the stream is copied bit for bit |
-| Manifests | kept, outside the dataset | training needs the split, clip lengths for batching and normalised text; Auto-AVSR needs the same in its label files |
-| Which clips are masked | training clips only | error rates measured on masked video would not describe accuracy on real video |
-| When the split is made | while building | it decides which clips are masked, so it cannot change afterwards |
-| Test set | whole sessions | neighbouring clips come from the same speech; a random split would leak |
-| Validation set | last 5 % of each other session | a contiguous block, for the same reason |
+The training target is the normalised text of the clip table: upper case
+with Turkish casing (`i` -> `İ`, `ı` -> `I`, 29 letters plus Q, W, X),
+digits spelled out, punctuation removed. Partition-Time Masking is applied
+during training (`augment.video.ptm`), not written into the clips.
+`configs/base.yaml` points at this dataset and its tokenizer.
 
 ### Mouth crop
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `--roi-scale` | 0.63 | side of the crop as a fraction of face height; 0.63 shows the area of the 96 px Auto-AVSR crop (measured on 567 clips) |
+| `--roi-scale` | 0.63 | side of the crop as a fraction of face height; 0.63 shows the area of the 96 px Auto-AVSR crop |
 | `--smoothing` | `kalman` | smoothing of the crop position: `kalman` (with backward pass), `moving_average` (Auto-AVSR), `one_euro` (causal), `none` |
 | `--out-size` | 96 | side of the stored frames |
+| `--variant` | `mouth` | `face` writes a square face crop instead (`--out-size 224 --roi-scale 1.3`) |
 
-- **Scale** comes from the forehead-to-chin distance, which survives head
-  turns; the distance between the eyes collapses in profile views. One scale
-  is used per clip so the crop does not zoom as the jaw moves.
-- **Landmarks are cached** in `data/cache/`, so building another dataset from
-  the same clips takes minutes instead of hours.
-- CLAHE and Procrustes alignment are deliberately left out.
+Scale comes from the forehead-to-chin distance, one value per clip. The
+speaker is the tracked face whose lip opening varies most among the faces at
+least half as tall as the tallest; close-ups in the chamber regularly show a
+listener beside the speaker. During training a random 88x88 crop is taken
+from the stored frames (a centre crop in evaluation).
 
-During training a random 88x88 crop is taken from the stored frames (a centre
-crop in evaluation), as in Auto-AVSR. `augment.video.crop_size=0` uses the
-stored frames unchanged.
-
-### Partition-Time Masking
-
-One span covering 20 % of the clip; inside it, 2 cells of a 4x4 grid are
-blacked out in every frame, with a new choice of cells per frame. The mask of
-a clip is derived from its name and `--seed`, so rebuilding reproduces it.
-
-Because the masks are in the clips, `data.ptm_in_clips` is true and masking
-during training is off. Setting both on is rejected, as every clip would be
-masked twice. For a dataset built with `--no-ptm`, set
-`data.ptm_in_clips=false augment.video.ptm.enabled=true` to mask during
-training instead, with a new mask in every epoch.
-
-## Label filtering
-
-The transcripts are machine generated and noisy. `scripts/audit_labels.py`
-audits them (results in `docs/label_audit.md`), and the dataset builder
-leaves a clip out when any of these holds:
+## Which utterances are kept
 
 | Check | Catches |
 |---|---|
-| Same transcript as a clip at most 5 positions away | invented sentences, which come in runs |
+| Same transcript as an utterance at most 5 positions away | invented sentences, which come in runs |
 | Sentence that mostly occurs in runs within its session | the stray occurrences of such a sentence |
 | Word or short phrase looping inside the transcript | `DA DA DA DA ...` |
 | Known invented phrase making up half of the transcript or more | subtitle credits such as `ALTYAZI M.K.` |
 | Words too short for their length, in over 25 % of words | words squeezed into one timestamp tick |
 | Mean / minimum word confidence below 0.80 / 0.30 | uncertain transcripts |
-| Speaking rate outside 4 to 25 characters per second | text that does not fit the clip |
-| Speech end more than 1 s from clip end | transcript of a different segment |
-| Face found in under 80 % of frames | occluded or missing faces |
+| Whisper's `no_speech_prob` above 0.6 | text invented over silence or noise |
+| Speaking rate outside 4 to 25 letters per second | text that does not fit the span |
+| Shorter than 12 frames or longer than 600 | |
+| Face found in under 80 % of frames, or face under 50 px tall | wide shots of the chamber, occlusions |
 
-Genuine phrases that are merely frequent, such as `TEŞEKKÜR EDERIM`, are kept:
-they are spread over the recordings instead of bunched together.
-
-The clip table next to the dataset lists every source clip with its verdict.
-
-Text is normalised to upper-case Turkish letters and spaces: punctuation is
-removed, digits are spelled out (`1921'DE` becomes `BIN DOKUZ YÜZ YIRMI BIRDE`)
-and circumflexes are dropped.
+Genuine phrases that are merely frequent, such as `TEŞEKKÜR EDERİM`, are kept:
+they are spread over the recordings instead of bunched together. The clip
+table lists every utterance with its verdict. On the 39 recordings the text
+rules remove 4.0 % of the utterances and the video checks 13.0 %, nearly all
+of them shots without a visible face.
 
 ## Model options
 
@@ -217,7 +186,8 @@ and circumflexes are dropped.
 
 With the base preset and `model.mask_conv_padding=false` the model computes
 exactly what the original Auto-AVSR code computes from the same weights
-(`tests/test_reference_equivalence.py`).
+(`tests/test_reference_equivalence.py`; it needs the original code, whose
+location is read from `AUTO_AVSR_REFERENCE`, and skips when it is absent).
 
 ## A/B experiments
 
@@ -260,9 +230,11 @@ model does not learn; see `docs/findings.md`.
 
 ## Moving to a cloud GPU
 
-See `docs/deployment.md`. In short: clone the code, unpack the dataset into
-`data/`, the support files into the project folder and the weights into
-`pretrained/`, install `requirements.txt`, and run
+See `docs/deployment.md` (written for the first corpus; the folder is now
+`dataset/tr-lrs-v3` with its `-manifests` and `-tokenizer` folders next to
+it). In short: clone the code, unpack the dataset into `dataset/`, the
+support files into the project folder and the weights into `pretrained/`,
+install `requirements.txt`, and run
 
 ```bash
 python scripts/preflight.py -c configs/finetune/vsr_base.yaml
@@ -273,10 +245,12 @@ wrong.
 
 ## Further reading
 
-- `docs/dataset_construction.md`: how the dataset was cleaned and built, for the methods section of a paper.
-- `docs/project_report.md`: what was built, from which sources, and what was measured.
+- `docs/dataset_construction.md`: how the dataset was transcribed, cut, cleaned and verified, for the methods section of a paper.
+- `docs/v3_degisiklik_raporu.md` (Turkish): what was wrong with the first corpus, how it was fixed, and the accounting of hours from recordings to dataset.
+- `docs/audit_and_roadmap_2026-10-17.md`: the audit that led to the rebuild, the decisions, and the log of the rebuild.
+- `docs/project_report.md`: what was built, from which sources, and what was measured (September 2026, first corpus).
 - `docs/deployment.md`: the remote server and the full fine-tuning, step by step.
-- `docs/findings.md`: what has been measured so far.
-- `docs/label_audit.md`: audit of every transcript in the corpus.
+- `docs/findings.md`: what has been measured so far (first corpus).
 - `docs/roadmap.md`: notes on dataset cleaning and low-latency recognition.
 - `docs/literature.md`: the papers behind each option.
+- `docs/archive/`: the construction and label audit of the first corpus.

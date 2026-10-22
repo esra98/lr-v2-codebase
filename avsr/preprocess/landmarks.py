@@ -44,7 +44,7 @@ INNER_LIP_LOWER = 16
 class FaceLandmarker:
     """Per-frame face-mesh detector returning pixel coordinates."""
 
-    def __init__(self, model_path=DEFAULT_MODEL_PATH, min_confidence=0.3):
+    def __init__(self, model_path=DEFAULT_MODEL_PATH, min_confidence=0.3, num_faces=1, delegate="cpu"):
         if not os.path.isfile(model_path):
             raise FileNotFoundError(
                 f"MediaPipe model not found at {model_path}. Download face_landmarker.task "
@@ -56,29 +56,43 @@ class FaceLandmarker:
         from mediapipe.tasks.python import vision
 
         self._mp = mp
+        # "gpu" runs the models through OpenGL ES (on this kind of machine the
+        # integrated GPU), which is faster than a loaded CPU and leaves the
+        # cores to other work; it falls back to the CPU when no GL context
+        # can be made.
+        delegates = {"cpu": mp_python.BaseOptions.Delegate.CPU, "gpu": mp_python.BaseOptions.Delegate.GPU}
         options = vision.FaceLandmarkerOptions(
-            base_options=mp_python.BaseOptions(model_asset_path=model_path),
+            base_options=mp_python.BaseOptions(model_asset_path=model_path, delegate=delegates[delegate]),
             # IMAGE mode is stateless, so one instance can serve many clips.
             running_mode=vision.RunningMode.IMAGE,
-            num_faces=1,
+            num_faces=num_faces,
             min_face_detection_confidence=min_confidence,
             min_face_presence_confidence=min_confidence,
         )
-        self._detector = vision.FaceLandmarker.create_from_options(options)
+        try:
+            self._detector = vision.FaceLandmarker.create_from_options(options)
+        except RuntimeError:
+            if delegate == "cpu":
+                raise
+            options.base_options.delegate = delegates["cpu"]
+            self._detector = vision.FaceLandmarker.create_from_options(options)
+        self.delegate = delegate
 
-    def detect(self, frame):
-        """Return [NUM_LANDMARKS, 2] float32 pixel coordinates, or None."""
+    def detect_all(self, frame):
+        """Return a list of [NUM_LANDMARKS, 2] float32 arrays, one per face found."""
         mp = self._mp
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(frame))
         result = self._detector.detect(image)
-        if not result.face_landmarks:
-            return None
         height, width = frame.shape[:2]
-        points = result.face_landmarks[0]
-        return np.array(
-            [[points[i].x * width, points[i].y * height] for i in _MESH_INDICES],
-            dtype=np.float32,
-        )
+        return [
+            np.array([[points[i].x * width, points[i].y * height] for i in _MESH_INDICES], dtype=np.float32)
+            for points in result.face_landmarks
+        ]
+
+    def detect(self, frame):
+        """Return [NUM_LANDMARKS, 2] float32 pixel coordinates of the first face, or None."""
+        faces = self.detect_all(frame)
+        return faces[0] if faces else None
 
     def detect_video(self, frames):
         """Detect on every frame; entries are None where detection failed."""

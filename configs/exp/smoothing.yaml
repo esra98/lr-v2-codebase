@@ -1,17 +1,17 @@
 # Does smoothing the crop trajectory help?
 #
-# Needs two datasets without masks:
-#   python scripts/build_dataset.py --out data/ab/no-ptm --no-ptm --holdout-sessions ...
-#   python scripts/build_dataset.py --out data/ab/raw-crop --no-ptm --smoothing none --holdout-sessions ...
+# Needs a second dataset cut at the raw landmark positions:
+#   python scripts/corpus.py cut --dataset dataset/tr-lrs-v3-raw --smoothing none
+#   python scripts/corpus.py build --dataset dataset/tr-lrs-v3-raw --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
 name: smoothing
 description: >
   Mouth crops cut at the raw per-frame landmark positions versus positions
-  smoothed by a Kalman filter with a backward pass. Same ROI size, no PTM.
+  smoothed by a Kalman filter with a backward pass. Same ROI size.
 control: raw
 seeds: [1, 2, 3]
 metrics: [val/cer, val/wer, val/loss]
 files: [configs/exp/_local_video.yaml]
-overrides: [data.ptm_in_clips=false]
+overrides: []
 arms:
-  raw: [data.root=data/ab/raw-crop]
-  kalman: [data.root=data/ab/no-ptm]
+  raw: [data.root=dataset/tr-lrs-v3-raw, data.manifests=dataset/tr-lrs-v3-raw-manifests]
+  kalman: []

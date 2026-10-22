@@ -6,13 +6,14 @@ exp_dir: exp
 exp_name: default
 
 data:
-  # Dataset folder made by scripts/build_dataset.py: <session>/<clip>.mp4
-  # (96x96 mouth crop with the audio inside), .aac and .txt.
-  root: data/tr-lrs-clean-ptm
-  manifests: data/manifests
-  # Whether Partition-Time Masking is already written into the clips. It
-  # must then not be applied again during training.
-  ptm_in_clips: true
+  # Dataset folder made by scripts/corpus.py: <session>/<clip>.mp4 (96x96
+  # mouth crop with the audio inside) and <clip>.txt.
+  root: dataset/tr-lrs-v3
+  manifests: dataset/tr-lrs-v3-manifests
+  # Whether Partition-Time Masking is already written into the clips (the
+  # first corpus of 2026-09 carried it). It must then not be applied again
+  # during training.
+  ptm_in_clips: false
   # Clips longer than this are left out. The longest clip of the dataset has
   # 252 frames. Must not exceed max_frames_per_batch.
   max_frames_per_clip: 300
@@ -32,7 +33,7 @@ data:
 tokenizer:
   type: unigram          # unigram | bpe | char
   vocab_size: 1000
-  model_path: data/tokenizer/unigram1000.model
+  model_path: dataset/tr-lrs-v3-tokenizer/unigram1000.model
 
 augment:
   video:
@@ -46,9 +47,8 @@ augment:
       stride_frames: 25   # one mask per second
       fill: zero          # zero | mean
     ptm:
-      # Masking during training. Off by default because the default
-      # dataset carries the masks in its clips.
-      enabled: false
+      # Partition-Time Masking during training, drawn anew every epoch.
+      enabled: true
       grid: 4
       alpha: 0.2
       num_partitions: 2

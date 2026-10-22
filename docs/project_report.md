@@ -3,12 +3,20 @@
 What was built, from which sources, how the dataset was cleaned, what was
 measured, and how the full fine-tuning is prepared. Written on 2026-09-29.
 
+**Note (2026-10-22).** This report describes the first corpus
+(`tr-lrs-clean-ptm`, 154,191 clips from 224x224 face clips). The corpus has
+since been rebuilt from the full recordings as `dataset/tr-lrs-v3`
+(225,977 clips, 224.6 hours, dotted and dotless I distinct); see
+`docs/dataset_construction.md` and `docs/audit_and_roadmap_2026-10-17.md`.
+Section 4 and the numbers in it are kept as a record of the first corpus.
+
 Detailed companions:
 
 | Document | Content |
 |---|---|
-| `docs/dataset_construction.md` | the dataset, rule by rule, for the methods section of a paper |
-| `docs/label_audit.md` | audit of all 218,091 transcripts |
+| `docs/dataset_construction.md` | the current dataset (v3), stage by stage, for the methods section of a paper |
+| `docs/archive/dataset_construction_v2_2026-09-28.md` | the first corpus, rule by rule |
+| `docs/archive/label_audit_v2_2026-09-28.md` | audit of all 218,091 transcripts of the first corpus |
 | `docs/findings.md` | every measurement made so far |
 | `docs/literature.md` | literature notes with reported results |
 | `docs/deployment.md` | the server, step by step |

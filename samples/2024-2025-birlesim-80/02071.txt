@@ -1,0 +1,3 @@
+Text:  davet edin.
+davet 0.040 0.480 1.000
+edin. 0.480 0.720 1.000

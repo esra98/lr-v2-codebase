@@ -1,0 +1,10 @@
+Text:  Partisi grubu adına Durmuş Ali Keskin Kalış buyurun lütfen.
+Partisi 0.040 0.400 0.998
+grubu 0.400 0.720 0.982
+adına 0.720 1.100 0.998
+Durmuş 1.100 1.520 0.721
+Ali 1.520 1.720 0.969
+Keskin 1.720 2.160 0.972
+Kalış 2.160 2.440 0.839
+buyurun 2.440 2.740 0.729
+lütfen. 2.740 2.960 0.918

@@ -1,0 +1,10 @@
+Text:  hedeflenen bütçedeki trafik cezası elli beş milyar TL 'ydi.
+hedeflenen 0.040 0.780 0.993
+bütçedeki 0.780 1.520 0.995
+trafik 1.520 2.380 0.994
+cezası 2.380 2.980 0.993
+elli 2.980 3.880 0.982
+beş 3.880 4.040 0.998
+milyar 4.040 4.520 0.998
+TL 4.520 4.700 0.979
+'ydi. 4.700 4.920 0.956

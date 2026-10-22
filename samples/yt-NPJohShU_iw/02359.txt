@@ -1,0 +1,6 @@
+Text:  iktidarınızın çürümüşlüğünüzün göstergelerinden bir tanesidir.
+iktidarınızın 0.040 1.460 0.989
+çürümüşlüğünüzün 1.460 3.020 0.964
+göstergelerinden 3.020 4.200 0.997
+bir 4.200 4.440 0.995
+tanesidir. 4.440 4.940 0.848

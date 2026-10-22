@@ -1,0 +1,6 @@
+Text:  Değerli milletvekilleri ne yazık ki
+Değerli 0.040 0.680 0.998
+milletvekilleri 0.680 1.860 0.985
+ne 1.860 2.900 0.792
+yazık 2.900 3.360 0.998
+ki 3.360 3.600 0.992

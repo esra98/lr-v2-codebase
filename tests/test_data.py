@@ -9,10 +9,8 @@ from avsr.data.manifest import (
     FilterConfig,
     Row,
     is_hallucinated_phrase,
-    judge_duration,
-    judge_session_labels,
+    judge_label,
     kept_rows,
-    load_session_labels,
     read_clip_table,
     read_manifest,
     write_clip_table,
@@ -38,6 +36,8 @@ from avsr.data.transforms import (
     speed_perturb,
     to_grayscale,
 )
+from avsr.text.labels import Utterance, Word
+from avsr.text.normalize import normalize_text
 from avsr.text.tokenizer import SentencePieceTokenizer
 
 # ---------------------------------------------------------------- transforms
@@ -361,66 +361,42 @@ def test_sampler_rejects_clips_longer_than_the_budget():
 # ------------------------------------------------------------------ manifest
 
 
-def _write_label(path, text, words):
-    lines = [f"Text:  {text}"] + [f"{w} {s:.4f} {e:.4f} {c:.4f}" for w, s, e, c in words]
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    path.with_suffix(".mp4").write_bytes(b"")  # a label counts only if its clip exists
+def _utterance(text, conf=0.95, end=1.96, words=None):
+    """An utterance with its words spread evenly over ``end`` seconds."""
+    if words is None:
+        parts = text.split()
+        step = (end - 0.04) / len(parts)
+        words = [(w, 0.04 + k * step, 0.04 + (k + 1) * step, conf) for k, w in enumerate(parts)]
+    return Utterance(text, [Word(w, s, e, c) for w, s, e, c in words])
 
 
-def _spread(text, conf=0.95, end=1.96):
-    words = text.split()
-    step = (end - 0.04) / len(words)
-    return [(w, 0.04 + k * step, 0.04 + (k + 1) * step, conf) for k, w in enumerate(words)]
+def _judge(session_texts, cfg=None):
+    """Verdict of every utterance of one session, in order (None = kept)."""
+    cfg = cfg or FilterConfig()
+    ids = [f"{i:05d}" for i in range(len(session_texts))]
+    texts = [normalize_text(u.text) for u in session_texts]
+    recurrent = find_recurrent({"s1": list(zip(ids, texts))}, cfg.recurrence)
+    return [judge_label(u, t, recurrent.get(("s1", i)), cfg) for u, t, i in zip(session_texts, texts, ids)]
 
 
-def test_label_verdicts(tmp_path):
-    session = tmp_path / "s1"
-    session.mkdir()
-    _write_label(session / "00000.txt", "SAYIN BAŞKAN TEŞEKKÜRLER", _spread("SAYIN BAŞKAN TEŞEKKÜRLER"))
-    _write_label(session / "00001.txt", "DEĞERLI ARKADAŞLAR", _spread("DEĞERLI ARKADAŞLAR", conf=0.4))
+def test_label_verdicts():
     squeezed = [("GENEL", 0.04, 1.9, 0.95), ("KURULU", 1.9, 1.92, 0.97), ("SELAMLIYORUM", 1.92, 1.96, 0.9)]
-    _write_label(session / "00002.txt", "GENEL KURULU SELAMLIYORUM", squeezed)
-    _write_label(session / "00003.txt", "...", [("...", 0.04, 1.9, 0.95)])
-    _write_label(session / "00004.txt", "ALTYAZI M.K.", _spread("ALTYAZI M.K."))
-    (session / "00005.mp4").write_bytes(b"")  # clip without a label file
-    (session / "00006.txt").write_text("no header\n")  # label without a clip: ignored
-
-    clips = load_session_labels(str(tmp_path), "s1")
-    assert [c[0] for c in clips] == [f"{i:05d}" for i in range(6)]
-    verdicts = judge_session_labels("s1", clips, FilterConfig())
-    assert verdicts == {
-        "00000": None,
-        "00001": "low_confidence",
-        "00002": "squeezed_words",
-        "00003": "empty_text",
-        "00004": "hallucinated_phrase",
-        "00005": "bad_label_file",
-    }
+    utterances = [
+        _utterance("SAYIN BAŞKAN TEŞEKKÜRLER"),
+        _utterance("DEĞERLI ARKADAŞLAR", conf=0.4),
+        _utterance("GENEL KURULU SELAMLIYORUM", words=squeezed),
+        _utterance("...", words=[("...", 0.04, 1.9, 0.95)]),
+        _utterance("ALTYAZI M.K."),
+    ]
+    assert _judge(utterances) == [None, "low_confidence", "squeezed_words", "empty_text", "hallucinated_phrase"]
+    assert judge_label(None, "", None, FilterConfig()) == "bad_label_file"
 
 
-def test_recurrent_clips_are_rejected_but_their_neighbours_are_kept(tmp_path):
-    session = tmp_path / "s1"
-    session.mkdir()
+def test_recurrent_clips_are_rejected_but_their_neighbours_are_kept():
     texts = ["BIR ŞEY SÖYLEYECEĞIM", "ABONE KALIN LÜTFEN", "ABONE KALIN LÜTFEN", "ABONE KALIN LÜTFEN", "BAŞKA BIR CÜMLE"]
-    for i, text in enumerate(texts):
-        _write_label(session / f"{i:05d}.txt", text, _spread(text))
-    clips = load_session_labels(str(tmp_path), "s1")
-    verdicts = judge_session_labels("s1", clips, FilterConfig())
-    assert [verdicts[f"{i:05d}"] for i in range(5)] == [None, BURST, BURST, BURST, None]
-    assert not any(judge_session_labels("s1", clips, FilterConfig(drop_recurrent=False)).values())
-
-
-def test_duration_verdicts():
-    from types import SimpleNamespace
-
-    cfg = FilterConfig()
-    utt = SimpleNamespace(speech_end=2.0)
-    text = "SAYIN BAŞKAN DEĞERLI MILLETVEKILLERI"
-    assert judge_duration(50, utt, text, cfg) is None
-    assert judge_duration(601, utt, text, cfg) == "too_long"
-    assert judge_duration(20, utt, text, cfg) == "speaking_rate"  # 33 letters in 0.8 s
-    assert judge_duration(300, utt, "EVET HAYIR", cfg) == "speaking_rate"  # 9 letters in 12 s
-    assert judge_duration(100, utt, text + " " + text, cfg) == "timing_mismatch"  # speech ends 2 s early
+    utterances = [_utterance(t) for t in texts]
+    assert _judge(utterances) == [None, BURST, BURST, BURST, None]
+    assert not any(_judge(utterances, FilterConfig(drop_recurrent=False)))
 
 
 def _table_row(clip_id, verdict="kept", split="train", session="s1"):

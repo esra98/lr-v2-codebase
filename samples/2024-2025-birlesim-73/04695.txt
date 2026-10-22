@@ -1,0 +1,9 @@
+Text:  makyajlamayla iklim yasası adı altında önümüze getirilen bu
+makyajlamayla 0.040 1.000 0.993
+iklim 1.000 1.720 0.991
+yasası 1.720 2.340 0.997
+adı 2.340 2.780 0.998
+altında 2.780 3.320 0.999
+önümüze 3.320 4.220 0.999
+getirilen 4.220 4.680 0.979
+bu 4.680 4.860 0.991

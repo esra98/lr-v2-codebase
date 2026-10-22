@@ -8,23 +8,24 @@ import csv
 import os
 from dataclasses import asdict, dataclass, field
 
-from avsr.data.recurrence import RecurrenceConfig, find_recurrent
-from avsr.text.labels import parse_label_file
-from avsr.text.normalize import normalize_text
+from avsr.data.recurrence import RecurrenceConfig
+from avsr.text.normalize import fold_dotted_i
 
 MANIFEST_FIELDS = ["utt_id", "session", "clip_id", "num_frames", "text", "mean_conf", "yaw"]
 
 # Sentences Whisper is known to invent on silence or noise in Turkish audio
 # (subtitle credits and video sign-offs from its training data), normalised.
+# They are compared with İ folded into I, so they match transcripts of either
+# alphabet.
 HALLUCINATED_PHRASES = (
     "ALTYAZI M K",
     "ALTYAZI",
     "ABONE OL",
-    "IZLEDIĞINIZ IÇIN TEŞEKKÜR",
-    "IZLEDIĞINIZ IÇIN TEŞEKKÜRLER",
-    "BIR SONRAKI VIDEODA GÖRÜŞMEK ÜZERE",
-    "SESLENDIREN",
-    "ÇEVIRI VE ALTYAZI",
+    "İZLEDİĞİNİZ İÇİN TEŞEKKÜR",
+    "İZLEDİĞİNİZ İÇİN TEŞEKKÜRLER",
+    "BİR SONRAKİ VİDEODA GÖRÜŞMEK ÜZERE",
+    "SESLENDİREN",
+    "ÇEVİRİ VE ALTYAZI",
 )
 
 
@@ -35,9 +36,9 @@ def is_hallucinated_phrase(text, min_share=0.5):
     sentences that merely contain the words, such as a speech about
     subscriptions containing "ABONE OLAN".
     """
-    words = text.split()
+    words = fold_dotted_i(text).split()
     for phrase in HALLUCINATED_PHRASES:
-        target = phrase.split()
+        target = fold_dotted_i(phrase).split()
         if len(target) < min_share * len(words):
             continue
         for start in range(len(words) - len(target) + 1):
@@ -50,18 +51,15 @@ def is_hallucinated_phrase(text, min_share=0.5):
 class FilterConfig:
     """Thresholds for rejecting utterances with unreliable labels."""
 
-    max_frames: int = 600
     min_words: int = 1
     min_mean_conf: float = 0.80
     min_word_conf: float = 0.30
     drop_recurrent: bool = True
     recurrence: RecurrenceConfig = field(default_factory=RecurrenceConfig)
     max_short_word_fraction: float = 0.25
+    # Letters per second over the utterance's span (avsr.corpus.segment).
     min_chars_per_sec: float = 4.0
     max_chars_per_sec: float = 25.0
-    # Speech must end near the end of the clip; a large gap means the
-    # transcript does not describe this clip.
-    max_end_gap_sec: float = 1.0
     drop_hallucinated_phrases: bool = True
 
 
@@ -100,27 +98,6 @@ class Row:
         return d
 
 
-def load_session_labels(raw_root, session):
-    """Labels of one session in clip order, for every clip that has a video.
-
-    Returns (clip_id, utterance or None, normalised text) triples. The
-    utterance is None when the label file is missing or malformed.
-    """
-    folder = os.path.join(raw_root, session)
-    clips = []
-    for name in sorted(os.listdir(folder)):
-        clip_id, ext = os.path.splitext(name)
-        if ext != ".mp4":
-            continue
-        try:
-            utt = parse_label_file(os.path.join(folder, clip_id + ".txt"))
-            text = normalize_text(utt.text)
-        except (OSError, ValueError):
-            utt, text = None, ""
-        clips.append((clip_id, utt, text))
-    return clips
-
-
 def judge_label(utt, text, recurrent_reason, cfg):
     """Reason for rejecting a clip because of its label, or None.
 
@@ -140,27 +117,6 @@ def judge_label(utt, text, recurrent_reason, cfg):
     if utt.mean_conf < cfg.min_mean_conf or utt.min_conf < cfg.min_word_conf:
         return "low_confidence"
     return None
-
-
-def judge_duration(num_frames, utt, text, cfg, fps=25.0):
-    """Reason for rejecting a clip whose label does not fit its length, or None."""
-    if num_frames > cfg.max_frames:
-        return "too_long"
-    duration = num_frames / fps
-    rate = len(text.replace(" ", "")) / duration
-    if not cfg.min_chars_per_sec <= rate <= cfg.max_chars_per_sec:
-        return "speaking_rate"
-    if abs(duration - utt.speech_end) > cfg.max_end_gap_sec:
-        return "timing_mismatch"
-    return None
-
-
-def judge_session_labels(session, clips, cfg):
-    """Label verdict of every clip of a session: dict clip_id -> reason or None."""
-    recurrent = find_recurrent({session: [(clip_id, text) for clip_id, _, text in clips]}, cfg.recurrence)
-    return {
-        clip_id: judge_label(utt, text, recurrent.get((session, clip_id)), cfg) for clip_id, utt, text in clips
-    }
 
 
 def write_clip_table(path, rows):

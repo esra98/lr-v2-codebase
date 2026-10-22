@@ -1,0 +1,3 @@
+Text:  Öyle olmamalı.
+Öyle 0.040 0.680 0.902
+olmamalı. 0.680 2.260 0.999

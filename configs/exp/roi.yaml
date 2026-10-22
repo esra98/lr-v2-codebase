@@ -1,9 +1,12 @@
 # How much of the face the crop should show.
 #
-# Needs three datasets without masks:
-#   python scripts/build_dataset.py --out data/ab/no-ptm --no-ptm --holdout-sessions ...
-#   python scripts/build_dataset.py --out data/ab/roi-055 --no-ptm --roi-scale 0.55 --holdout-sessions ...
-#   python scripts/build_dataset.py --out data/ab/roi-080 --no-ptm --roi-scale 0.80 --holdout-sessions ...
+# Needs two more datasets cut from the same utterances (the landmarks are
+# cached under work/<session>/landmarks/, so only the crop is redone), each
+# with its own build:
+#   python scripts/corpus.py cut --dataset dataset/tr-lrs-v3-roi055 --roi-scale 0.55
+#   python scripts/corpus.py cut --dataset dataset/tr-lrs-v3-roi080 --roi-scale 0.80
+#   python scripts/corpus.py build --dataset dataset/tr-lrs-v3-roi055 --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
+#   python scripts/corpus.py build --dataset dataset/tr-lrs-v3-roi080 --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
 name: roi
 description: >
   ROI side as a fraction of face height: 0.55 (tight, lips and chin), 0.63
@@ -13,8 +16,8 @@ control: mouth
 seeds: [1, 2, 3]
 metrics: [val/cer, val/wer, val/loss]
 files: [configs/exp/_local_video.yaml]
-overrides: [data.ptm_in_clips=false]
+overrides: []
 arms:
-  mouth: [data.root=data/ab/no-ptm]
-  tight: [data.root=data/ab/roi-055]
-  lower_face: [data.root=data/ab/roi-080]
+  mouth: []
+  tight: [data.root=dataset/tr-lrs-v3-roi055, data.manifests=dataset/tr-lrs-v3-roi055-manifests]
+  lower_face: [data.root=dataset/tr-lrs-v3-roi080, data.manifests=dataset/tr-lrs-v3-roi080-manifests]

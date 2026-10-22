@@ -1,0 +1,5 @@
+Text:  ve kamuoyuna sormak istiyorum.
+ve 0.040 0.400 0.995
+kamuoyuna 0.400 0.920 0.999
+sormak 0.920 1.380 0.999
+istiyorum. 1.380 1.640 0.998
