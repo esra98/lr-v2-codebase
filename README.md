@@ -50,7 +50,8 @@ samples/        50 clips of the dataset with their labels, to see the format
 
 The current dataset is `dataset/tr-lrs-v3` (October 2026): 39 recordings,
 225,977 clips, 224.6 hours, built as described in
-`docs/dataset_construction.md`. The first corpus (September 2026, built
+`docs/dataset_construction.md`. `DATASET.md` says where the archive is,
+how to unpack it and that this codebase was checked against it. The first corpus (September 2026, built
 from 224x224 face clips with the dotted and dotless I merged) and the
 scripts that built it are tagged `v2-dataset-2026-09-28` and described in
 `docs/archive/`.
