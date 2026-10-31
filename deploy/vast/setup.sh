@@ -37,7 +37,7 @@ echo "Sürücünün desteklediği CUDA: ${driver_cuda:-?} (PyTorch 2.13 cu129 i�
 case "$driver_cuda" in 11.*|10.*) echo "Sürücü çok eski. vast.ai'de 'Max CUDA >= 12.8' filtresiyle sunucu seç." >&2; exit 1;; esac
 
 free_gb=$(df -BG --output=avail "$WORK" | tail -1 | tr -dc 0-9)
-need_gb=60
+need_gb=${NEED_GB:-60}   # boş disk sınırı (GB)
 done_before extract && need_gb=20
 echo "Boş disk ($WORK): ${free_gb} GB"
 if [ "$free_gb" -lt "$need_gb" ]; then
@@ -48,6 +48,11 @@ install -m 755 "$HERE/bin/rclone" "$WORK/bin/rclone"
 if [ -f "$HERE/rclone.conf" ]; then
     mkdir -p ~/.config/rclone && install -m 600 "$HERE/rclone.conf" ~/.config/rclone/rclone.conf
 fi
+# Boş Ubuntu imajlarında kök sertifikalar (ca-certificates) yok; rclone Google'a
+# bağlanamaz. O zaman paketteki Mozilla sertifika dosyası kullanılır.
+if [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then
+    export SSL_CERT_FILE="$HERE/bin/cacert.pem"
+fi
 if ! rclone listremotes 2>/dev/null | grep -qx "${RCLONE_REMOTE}:"; then
     cat >&2 <<EOF
 rclone'da '${RCLONE_REMOTE}:' adında bir Drive bağlantısı yok.
@@ -57,6 +62,12 @@ sonra 'bash setup.sh' komutunu tekrar çalıştır.
 EOF
     exit 1
 fi
+RC=(--bind 0.0.0.0 --drive-root-folder-id "$DRIVE_FOLDER_ID")
+if ! listing=$(rclone lsf "${RCLONE_REMOTE}:" "${RC[@]}" 2>&1); then
+    echo "$listing" | tail -3 >&2
+    echo "Drive klasörüne erişilemedi (README.md, 7. Sorun giderme)." >&2; exit 1
+fi
+echo "Drive erişimi tamam: $(echo "$listing" | grep -vc NOTICE) dosya"
 
 # ---------------------------------------------------------------- 2. indirme
 step "2/4 Drive'dan indirme"
@@ -65,9 +76,11 @@ if done_before download; then
 else
     for f in "$DATASET_TAR" "$WHEELHOUSE_TAR" "$PRETRAINED_PTH"; do
         echo "-> $f"
-        rclone copy "${RCLONE_REMOTE}:" "$DL" --bind 0.0.0.0 --drive-root-folder-id "$DRIVE_FOLDER_ID" \
-            --include "/$f" --multi-thread-streams 8 --stats 30s --stats-one-line -v 2>&1 | grep -v DEBUG || true
-        [ -f "$DL/$f" ] || { echo "$f indirilemedi" >&2; exit 1; }
+        if ! rclone copy "${RCLONE_REMOTE}:" "$DL" "${RC[@]}" --include "/$f" \
+                --multi-thread-streams 8 --stats 30s --stats-one-line -v; then
+            echo "$f indirilemedi; 'bash setup.sh' kaldığı yerden sürer." >&2; exit 1
+        fi
+        [ -f "$DL/$f" ] || { echo "$f Drive klasöründe yok" >&2; exit 1; }
     done
     echo "sha256 kontrolü (birkaç dakika)..."
     (cd "$DL" && sha256sum -c "$HERE/SHA256SUMS.drive")
