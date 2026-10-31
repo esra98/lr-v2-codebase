@@ -13,6 +13,13 @@ What was rehearsed locally and what was not is stated in section 10.
 `data.root` and `data.manifests` overrides below are only needed when the
 dataset is unpacked elsewhere. Read `data/` below as `dataset/`.
 
+**Note (2026-11-01).** For a fresh vast.ai server use `deploy/vast/`
+instead (`deploy/vast/README.md`, in Turkish): one small tar with the code
+and scripts that download the dataset, a wheelhouse (Python 3.12, PyTorch
+2.13 cu129) and the pretrained weights from Google Drive, check them, run
+the tests, train, and pack the finished model with
+`deploy/vast/MODEL_KULLANIMI.md`.
+
 ## 1. Overview
 
 | Step | Where | Time |

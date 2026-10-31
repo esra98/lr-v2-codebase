@@ -4,6 +4,7 @@ import json
 import os
 import sys
 
+import numpy as np
 import pytest
 import torch
 
@@ -313,3 +314,27 @@ def test_evaluate_script(toy_cfg, monkeypatch):
         assert summary["utterances"] == 4 and summary["ema"] is uses_ema
         assert len(summary["checkpoints"]) == average
     assert os.path.isfile(os.path.join(run_dir, "eval", "test_video.tsv"))
+
+
+def test_exported_model_transcribes(toy_cfg, monkeypatch, tmp_path):
+    import export_model as export_script
+
+    from avsr.inference import load_trained, transcribe
+
+    cfg = toy_cfg("model.modality=video", "train.max_epochs=1", "decode.beam_size=3", "exp_name=exportrun")
+    _run(cfg)
+    out = str(tmp_path / "model")
+    monkeypatch.setattr(sys, "argv", ["export_model.py", "--run", os.path.join(cfg.exp_dir, "exportrun"),
+                                      "--average", "1", "--out", out])
+    export_script.main()
+    assert os.path.isfile(os.path.join(out, "checkpoints", "epoch-avg.ckpt"))
+
+    # The model folder carries its own tokenizer and needs no dataset.
+    module, checkpoints, _ = load_trained(out)
+    assert module.cfg.tokenizer.model_path == os.path.join(out, "tokenizer.model")
+    assert [os.path.basename(p) for p in checkpoints] == ["epoch-avg.ckpt"]
+    crops = np.random.default_rng(0).integers(0, 256, (60, 96, 96, 3), dtype=np.uint8)
+    pieces = transcribe(module.eval(), crops, chunk_frames=25)
+    # 60 frames in pieces of 25: the last 10 frames are too short to decode.
+    assert [(start, end) for start, end, _ in pieces] == [(0.0, 1.0), (1.0, 2.0)]
+    assert all(isinstance(text, str) for _, _, text in pieces)

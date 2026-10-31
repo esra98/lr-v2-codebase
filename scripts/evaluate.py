@@ -12,7 +12,6 @@ Examples:
 """
 
 import argparse
-import glob
 import json
 import logging
 import os
@@ -28,24 +27,8 @@ os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 import torch  # noqa: E402
 from pytorch_lightning import Trainer  # noqa: E402
 
-from avsr.config import load_run_config  # noqa: E402
-from avsr.training.module import AVSRDataModule, AVSRModule  # noqa: E402
-from avsr.training.schedule import average_checkpoints  # noqa: E402
-
-
-def pick_checkpoints(run_dir, average):
-    """The ``average`` most recent of the kept epoch checkpoints.
-
-    Training keeps the ``train.save_top_k`` best epochs by validation CER.
-    Falls back to last.ckpt when no epoch checkpoint exists.
-    """
-    paths = sorted(glob.glob(os.path.join(run_dir, "checkpoints", "epoch*.ckpt")), key=os.path.getmtime)
-    if not paths:
-        last = os.path.join(run_dir, "checkpoints", "last.ckpt")
-        if not os.path.isfile(last):
-            raise FileNotFoundError(f"No checkpoints under {run_dir}")
-        return [last]
-    return paths[-average:]
+from avsr.inference import load_trained  # noqa: E402
+from avsr.training.module import AVSRDataModule  # noqa: E402
 
 
 def main():
@@ -57,21 +40,8 @@ def main():
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    # Weights come from the run's checkpoint, not from the original initialisation.
-    cfg = load_run_config(
-        os.path.join(args.run, "config.yaml"), [*args.overrides, "model.pretrained.path="]
-    )
-
-    module = AVSRModule(cfg)
-    checkpoints = pick_checkpoints(args.run, args.average)
-    state = average_checkpoints(checkpoints)
-    # The moving average kept during training is used when a single
-    # checkpoint is evaluated; averaging several checkpoints replaces it.
-    use_ema = module.ema is not None and len(checkpoints) == 1
-    if not use_ema:
-        module.ema = None
-        state = {k: v for k, v in state.items() if not k.startswith("ema.")}
-    module.load_state_dict(state)
+    module, checkpoints, use_ema = load_trained(args.run, args.average, args.overrides)
+    cfg = module.cfg
 
     datamodule = AVSRDataModule(cfg, module.tokenizer)
     loader = datamodule.test_dataloader() if args.split == "test" else datamodule._loader("val")
