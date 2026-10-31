@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 
 import numpy as np
 import pytest
@@ -9,6 +10,11 @@ from avsr.corpus import sources, transcribe
 from avsr.corpus.status import SessionStatus, atomic_write, options_hash
 from avsr.preprocess import video_io
 from avsr.text.labels import parse_label_file
+
+needs_ffmpeg = pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="ffmpeg is only installed where datasets are built",
+)
 
 # ---------------------------------------------------------------------------
 # status
@@ -52,6 +58,7 @@ def _toy_video(path, num_frames=50, size=96):
     return str(path)
 
 
+@needs_ffmpeg
 def test_probe_and_register(tmp_path):
     videos = tmp_path / "videos"
     videos.mkdir()
@@ -195,6 +202,7 @@ def test_segments_table_roundtrip_and_run(tmp_path):
 # ---------------------------------------------------------------------------
 
 
+@needs_ffmpeg
 def test_transcribe_chunks_merge_and_resume(tmp_path):
     video = _toy_video(tmp_path / "s1.mp4", num_frames=150)  # 6 s
     calls = []

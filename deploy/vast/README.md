@@ -137,7 +137,7 @@ bash check.sh
 
 | Test | Geçti sayılır | Süre |
 |---|---|---|
-| `pytest` | `254 passed` (bazıları `skipped`: referans kod ve dataset yapım paketleri sunucuda yok) | 5-10 dk |
+| `pytest` | **0 failed**; ~205 passed. Bazıları `skipped`: referans kod, OpenCV ve ffmpeg yalnızca dataset yapılan makinede var | 5-10 dk |
 | `scripts/preflight.py` | Son satır `READY TO TRAIN`. Her klip diskte mi, 500x3 klip açılıyor mu, 96x96 mı, tokenizer, pretrained ağırlıklar (762 tensör), disk, 20 adım gerçek eğitim | 3-5 dk |
 | `scripts/benchmark_memory.py` | 1.800 frame satırında `peak GB`, GPU belleğinin ~%80'inden az | 2 dk |
 
