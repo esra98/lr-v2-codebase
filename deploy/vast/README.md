@@ -74,6 +74,7 @@ Paketin kendi içinden gelenler (indirme yok):
 | `requirements-lock.txt` | Kurulan paketlerin kesin sürümleri |
 | `SHA256SUMS.drive` | Drive dosyalarının sha256 değerleri |
 | `SHA256SUMS.bundle` | Paketin içindeki dosyaların sha256 değerleri |
+| `REMOTE_RUN.md` | Sunucuda çalıştırmanın kısa yolu: kirala, gönder, kur, başlat, izle, indir |
 | `MODEL_KULLANIMI.md` | Eğitilen modeli kullanma rehberi; `finish.sh` model paketine koyar |
 
 Sunucuda son durum:
