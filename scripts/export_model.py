@@ -5,8 +5,8 @@ Usage:
     python scripts/export_model.py --run exp/vsr_finetune --average 10 --out tr-vsr-model
 
 The folder holds the averaged weights (checkpoints/epoch-avg.ckpt), the run
-configuration, the tokenizer and the evaluation results of the run, and is
-used like a run directory:
+configuration, the tokenizer, the evaluation results and the training
+metrics of the run, and is used like a run directory:
 
     python scripts/transcribe.py --run tr-vsr-model video.mp4
 """
@@ -49,9 +49,10 @@ def main():
     for path in glob.glob(os.path.join(args.run, "eval", "*")):
         os.makedirs(os.path.join(args.out, "eval"), exist_ok=True)
         shutil.copy(path, os.path.join(args.out, "eval"))
-    metrics = os.path.join(args.run, "csv", "metrics.csv")
-    if os.path.isfile(metrics):
-        shutil.copy(metrics, os.path.join(args.out, "training_metrics.csv"))
+    # metrics.csv, plus metrics.part1.csv, ... when the run was resumed
+    for path in glob.glob(os.path.join(args.run, "csv", "metrics*.csv")):
+        os.makedirs(os.path.join(args.out, "csv"), exist_ok=True)
+        shutil.copy(path, os.path.join(args.out, "csv"))
     info = {
         "run": os.path.abspath(args.run),
         "averaged_checkpoints": [os.path.basename(p) for p in checkpoints],

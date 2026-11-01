@@ -43,13 +43,15 @@ resume)
     echo "Sürdürülüyor (pid $!). Log: $PROJ/logs/$EXP.log"
     ;;
 status)
-    pgrep -f "scripts/train.py" >/dev/null && echo "eğitim ÇALIŞIYOR" || echo "eğitim çalışmıyor"
+    pgrep -f "^python scripts/train.py" >/dev/null && echo "eğitim ÇALIŞIYOR" || echo "eğitim çalışmıyor"
     nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader
     python - "$EXP" <<'EOF'
 import csv, glob, os, sys
 exp = sys.argv[1]
 rows = []
-for path in sorted(glob.glob(f"exp/{exp}/csv/metrics*.csv")):
+# Earlier parts of a resumed run first (metrics.part1.csv, part2, ...), then the current one.
+parts = sorted(glob.glob(f"exp/{exp}/csv/metrics.part*.csv"), key=lambda p: int(p.rsplit("part", 1)[1][:-4]))
+for path in parts + glob.glob(f"exp/{exp}/csv/metrics.csv"):
     rows += list(csv.DictReader(open(path)))
 val = [r for r in rows if r.get("val/cer")]
 last = next((r for r in reversed(rows) if r.get("train/loss_step")), None)

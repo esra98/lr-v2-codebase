@@ -247,7 +247,7 @@ Modeli kullanma: `tr-vsr-model/MODEL_KULLANIMI.md`.
 | `config.yaml` | Eğitim ayarları (model mimarisi buradan kurulur) |
 | `tokenizer.model` | 1.000 birimlik Türkçe SentencePiece |
 | `eval/test_video.json`, `.tsv` | Test sonuçları |
-| `training_metrics.csv`, `train.log` | Eğitim boyunca metrikler ve log |
+| `csv/metrics*.csv`, `logs/` | Eğitim boyunca metrikler, eğitim ve test logları |
 | `model_info.json` | Hangi checkpoint'ler ortalandı |
 | `code.tar`, `assets/` | Modeli çalıştıran kod ve yüz bulucu modeli |
 | `MODEL_KULLANIMI.md` | Kullanım rehberi |

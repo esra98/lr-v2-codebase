@@ -21,8 +21,8 @@ tr-vsr-model/
   tokenizer.model              1.000 birimlik Türkçe SentencePiece
   eval/test_video.json         test sonuçları (WER, CER)
   eval/test_video.tsv          her test klibi: referans ve modelin çıktısı
-  training_metrics.csv         epoch başına val/cer, val/wer, loss
-  train.log                    eğitim logu
+  csv/metrics*.csv             epoch başına val/cer, val/wer, loss (devam ettirilen eğitimde parça parça)
+  logs/                        eğitim ve test logları
   model_info.json              ortalanan checkpoint'ler
   code.tar                     modeli çalıştıran kod (lr-v2-codebase)
   assets/face_landmarker.task  yüz noktaları modeli (MediaPipe)

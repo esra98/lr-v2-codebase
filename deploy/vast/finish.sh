@@ -18,7 +18,7 @@ EXP=${EXP:-vsr_finetune}
 AVG=${AVG:-10}
 OUT=$WORK/out/tr-vsr-model
 
-if pgrep -f "scripts/train.py" >/dev/null; then
+if pgrep -f "^python scripts/train.py" >/dev/null; then
     echo "Eğitim hâlâ çalışıyor; bitmesini bekle (bash train.sh status)." >&2; exit 1
 fi
 
@@ -31,7 +31,7 @@ python scripts/export_model.py --run "exp/$EXP" --average "$AVG" --out "$OUT"
 cp "$HERE/MODEL_KULLANIMI.md" "$OUT/"
 cp "$HERE/code.tar" "$OUT/code.tar"
 cp -r assets "$OUT/assets"   # face_landmarker.task: transcribe.py'nin yüz bulucusu (git'te yok)
-cp "logs/$EXP.log" "$OUT/train.log"
+mkdir -p "$OUT/logs" && cp logs/"$EXP".*log "$OUT/logs/"   # eğitim (devam ettirildiyse parçaları) ve test logları
 
 echo; echo "=== 3/3 Deneme: model klasöründen test klibi okuma"
 clip=$(sed -n 2p dataset/tr-lrs-v3-manifests/test.tsv | cut -f1)
