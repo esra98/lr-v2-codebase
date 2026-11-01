@@ -43,7 +43,11 @@ Birden fazla GPU'lu sunucu almayın: kod tek GPU kullanır.
 |---|---|---|---|---|
 | 1 | [`tr-lrs-v3.tar.gz`](https://drive.google.com/file/d/15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC/view) | 12,9 GB | TR-LRS v3: 225.977 ağız kırpıntısı klip (96x96, 25 fps), manifest'ler, tokenizer | açılır: `lr-v2-codebase/dataset/`; tar silinir |
 | 2 | [`vsr_trlrs2lrs3vox2avsp_base.pth`](https://drive.google.com/file/d/162axOfnnZxVfhpbm9XK4SKAo_l3Qdpf_/view) | 1,0 GB | Auto-AVSR (Ma ve ark.) görsel konuşma tanıma ağırlıkları, başlangıç noktası | `lr-v2-codebase/pretrained/` |
-{{PART_ROWS}}
+| 3 | [`wheelhouse-py312-cu129.tar.part-00`](https://drive.google.com/file/d/1rAwn_Q4PhS60OLC3X9rJExzO6ZulEf98/view) | 900 MB | Wheelhouse, parça 1/5 (aşağıya bakın) | birleştirilir, kurulur, silinir |
+| 4 | [`wheelhouse-py312-cu129.tar.part-01`](https://drive.google.com/file/d/1kx0uzLgmr1r-ENWgRrgJSMuXVbHhq9D0/view) | 900 MB | Wheelhouse, parça 2/5 (aşağıya bakın) | birleştirilir, kurulur, silinir |
+| 5 | [`wheelhouse-py312-cu129.tar.part-02`](https://drive.google.com/file/d/1VFzwmBCiNUcHOTag0h4LMo1due8beG-D/view) | 900 MB | Wheelhouse, parça 3/5 (aşağıya bakın) | birleştirilir, kurulur, silinir |
+| 6 | [`wheelhouse-py312-cu129.tar.part-03`](https://drive.google.com/file/d/1b--7Hs5Oi8cPh1hpj2F5ehzjjjx9Ymqb/view) | 900 MB | Wheelhouse, parça 4/5 (aşağıya bakın) | birleştirilir, kurulur, silinir |
+| 7 | [`wheelhouse-py312-cu129.tar.part-04`](https://drive.google.com/file/d/1_u2b3SYTsp5PjX9oRBi0PidNM2TCpZsG/view) | 468 MB | Wheelhouse, parça 5/5 (aşağıya bakın) | birleştirilir, kurulur, silinir |
 
 Wheelhouse 4,3 GB'lık tek bir tar (`wheelhouse-py312-cu129.tar`): 63
 Python paketi (wheel), PyTorch 2.13.0+cu129 dahil. Drive'a yüklenirken

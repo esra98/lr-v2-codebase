@@ -3,3 +3,8 @@
 # Tek dosya linki: https://drive.google.com/file/d/<Drive ID>/view
 15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC  tr-lrs-v3.tar.gz
 162axOfnnZxVfhpbm9XK4SKAo_l3Qdpf_  vsr_trlrs2lrs3vox2avsp_base.pth
+1rAwn_Q4PhS60OLC3X9rJExzO6ZulEf98  wheelhouse-py312-cu129.tar.part-00
+1kx0uzLgmr1r-ENWgRrgJSMuXVbHhq9D0  wheelhouse-py312-cu129.tar.part-01
+1VFzwmBCiNUcHOTag0h4LMo1due8beG-D  wheelhouse-py312-cu129.tar.part-02
+1b--7Hs5Oi8cPh1hpj2F5ehzjjjx9Ymqb  wheelhouse-py312-cu129.tar.part-03
+1_u2b3SYTsp5PjX9oRBi0PidNM2TCpZsG  wheelhouse-py312-cu129.tar.part-04
