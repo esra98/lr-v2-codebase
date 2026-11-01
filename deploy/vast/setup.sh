@@ -4,11 +4,14 @@
 #   tar -xf lr-v2-vast.tar && cd lr-v2-vast && bash setup.sh
 #
 # Yaptıkları (her adım bitince işaretlenir; tekrar çalıştırınca bitenler atlanır):
-#   1. GPU, disk ve rclone ayarı kontrolü
-#   2. Drive'dan dataset, wheelhouse ve pretrained ağırlıkların indirilmesi + sha256 kontrolü
-#   3. Kodun, dataset'in ve ağırlıkların proje klasörüne açılması
-#   4. Python 3.12 ve kütüphanelerin internetsiz kurulumu (wheelhouse)
-# İnternet yalnızca Google Drive için gerekir.
+#   1. GPU ve disk kontrolü
+#   2. Taşınabilir Python 3.12 ve gdown (paketin içinden, internetsiz)
+#   3. Drive'dan dataset, wheelhouse parçaları ve pretrained ağırlıkların
+#      gdown ile indirilmesi (DRIVE_FILES.txt) + sha256 kontrolü
+#   4. Kodun, dataset'in ve ağırlıkların proje klasörüne açılması
+#   5. Kütüphanelerin wheelhouse'tan internetsiz kurulumu
+# İnternet yalnızca Google Drive için gerekir; Drive klasörü linkle paylaşılmış
+# olmalı (giriş yapmadan indirilir).
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -19,15 +22,15 @@ if ! mkdir -p "$WORK" 2>/dev/null || [ ! -w "$WORK" ]; then WORK=$HOME; fi
 PROJ=$WORK/lr-v2-codebase
 DL=$WORK/downloads
 DONE=$WORK/.setup-done
-mkdir -p "$DL" "$DONE" "$WORK/bin"
-export PATH="$WORK/bin:$PATH"
+mkdir -p "$DL" "$DONE"
+echo "WORK=$WORK" > "$HERE/.work"
 
 step() { echo; echo "=== $*"; }
 done_before() { [ -f "$DONE/$1" ]; }
 mark() { touch "$DONE/$1"; }
 
 # ---------------------------------------------------------------- 1. kontrol
-step "1/4 Kontrol"
+step "1/5 Kontrol"
 if ! command -v nvidia-smi >/dev/null || ! nvidia-smi >/dev/null 2>&1; then
     echo "nvidia-smi çalışmıyor: sunucuda GPU görünmüyor." >&2; exit 1
 fi
@@ -44,51 +47,43 @@ if [ "$free_gb" -lt "$need_gb" ]; then
     echo "En az ${need_gb} GB boş disk gerekir (dataset 13+14 GB, kütüphaneler 11 GB, checkpoint'ler ~15 GB)." >&2; exit 1
 fi
 
-install -m 755 "$HERE/bin/rclone" "$WORK/bin/rclone"
-if [ -f "$HERE/rclone.conf" ]; then
-    mkdir -p ~/.config/rclone && install -m 600 "$HERE/rclone.conf" ~/.config/rclone/rclone.conf
+# ---------------------------------------------------------------- 2. python + gdown
+step "2/5 Python 3.12 ve gdown"
+if done_before tools; then
+    echo "daha önce kuruldu"
+else
+    rm -rf "$WORK/python" "$WORK/tools"
+    tar -xzf "$HERE/bin/python-3.12.tar.gz" -C "$WORK"
+    "$WORK/python/bin/python3" -m venv "$WORK/tools"
+    "$WORK/tools/bin/pip" install -q --no-index --find-links "$HERE/bin/gdown-wheels" gdown
+    mark tools
 fi
-# Boş Ubuntu imajlarında kök sertifikalar (ca-certificates) yok; rclone Google'a
-# bağlanamaz. O zaman paketteki Mozilla sertifika dosyası kullanılır.
-if [ ! -s /etc/ssl/certs/ca-certificates.crt ]; then
-    export SSL_CERT_FILE="$HERE/bin/cacert.pem"
-fi
-if ! rclone listremotes 2>/dev/null | grep -qx "${RCLONE_REMOTE}:"; then
-    cat >&2 <<EOF
-rclone'da '${RCLONE_REMOTE}:' adında bir Drive bağlantısı yok.
-Laptoptan rclone ayarını sunucuya kopyala (README.md, adım 2):
-    scp -P <port> ~/.config/rclone/rclone.conf root@<sunucu>:$HERE/rclone.conf
-sonra 'bash setup.sh' komutunu tekrar çalıştır.
-EOF
-    exit 1
-fi
-RC=(--bind 0.0.0.0 --drive-root-folder-id "$DRIVE_FOLDER_ID")
-if ! listing=$(rclone lsf "${RCLONE_REMOTE}:" "${RC[@]}" 2>&1); then
-    echo "$listing" | tail -3 >&2
-    echo "Drive klasörüne erişilemedi (README.md, 7. Sorun giderme)." >&2; exit 1
-fi
-echo "Drive erişimi tamam: $(echo "$listing" | grep -vc NOTICE) dosya"
+GDOWN=$WORK/tools/bin/gdown
+"$GDOWN" --version
 
-# ---------------------------------------------------------------- 2. indirme
-step "2/4 Drive'dan indirme"
+# ---------------------------------------------------------------- 3. indirme
+step "3/5 Drive'dan indirme (gdown)"
 if done_before download; then
     echo "daha önce indirildi"
 else
-    for f in "$DATASET_TAR" "$WHEELHOUSE_TAR" "$PRETRAINED_PTH"; do
-        echo "-> $f"
-        if ! rclone copy "${RCLONE_REMOTE}:" "$DL" "${RC[@]}" --include "/$f" \
-                --multi-thread-streams 8 --stats 30s --stats-one-line -v; then
-            echo "$f indirilemedi; 'bash setup.sh' kaldığı yerden sürer." >&2; exit 1
+    # DRIVE_FILES.txt: "<drive id>  <dosya adı>" satırları
+    while read -r id name; do
+        case "$id" in ''|'#'*) continue;; esac
+        echo "-> $name"
+        if ! (cd "$DL" && "$GDOWN" "$id" -O "$name" --continue --retries 5 --no-cookies); then
+            echo "$name indirilemedi; 'bash setup.sh' kaldığı yerden sürer (KURULUM.md, 7)." >&2; exit 1
         fi
-        [ -f "$DL/$f" ] || { echo "$f Drive klasöründe yok" >&2; exit 1; }
-    done
+    done < "$HERE/DRIVE_FILES.txt"
+    echo "wheelhouse parçaları birleştiriliyor..."
+    cat "$DL/$WHEELHOUSE_TAR".part-* > "$DL/$WHEELHOUSE_TAR"
     echo "sha256 kontrolü (birkaç dakika)..."
     (cd "$DL" && sha256sum -c "$HERE/SHA256SUMS.drive")
+    rm -f "$DL/$WHEELHOUSE_TAR".part-*
     mark download
 fi
 
-# ---------------------------------------------------------------- 3. açma
-step "3/4 Proje klasörü: $PROJ"
+# ---------------------------------------------------------------- 4. açma
+step "4/5 Proje klasörü: $PROJ"
 if done_before extract; then
     echo "daha önce açıldı"
 else
@@ -109,12 +104,11 @@ else
     mark extract
 fi
 
-# ---------------------------------------------------------------- 4. python
-step "4/4 Python 3.12 ve kütüphaneler"
+# ---------------------------------------------------------------- 5. kütüphaneler
+step "5/5 Kütüphaneler (wheelhouse, internetsiz)"
 if done_before python; then
     echo "daha önce kuruldu"
 else
-    rm -rf "$WORK/python" && tar -xzf "$HERE/bin/python-3.12.tar.gz" -C "$WORK"
     mkdir -p "$DL/wheelhouse" && tar -xf "$DL/$WHEELHOUSE_TAR" -C "$DL/wheelhouse"
     rm -rf "$PROJ/.venv"
     "$WORK/python/bin/python3" -m venv "$PROJ/.venv"
@@ -133,4 +127,3 @@ EOF
 
 echo
 echo "KURULUM TAMAM. Sıradaki: bash $HERE/check.sh"
-echo "WORK=$WORK" > "$HERE/.work"

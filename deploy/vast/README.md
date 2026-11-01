@@ -2,18 +2,20 @@
 
 Bu paket (`lr-v2-vast.tar`), boş bir Ubuntu vast.ai sunucusunda tam
 fine-tune'u başlatmak için gereken her şeyi içerir: kod, kurulum ve test
-betikleri, Drive bağlantıları ve sha256 değerleri. Büyük dosyalar (dataset,
+betikleri, Drive linkleri ve sha256 değerleri. Büyük dosyalar (dataset,
 Python kütüphaneleri, pretrained ağırlıklar) paketin içinde değildir;
-`setup.sh` onları Google Drive'dan indirir ve doğrular.
+`setup.sh` onları Google Drive'dan **gdown** ile indirir ve doğrular. Drive
+klasörü linkle paylaşılmış olduğu için sunucuda Google hesabı ya da anahtar
+gerekmez.
 
 Akış:
 
 ```
-laptop ──scp──> sunucu: lr-v2-vast.tar + rclone.conf
+laptop ──scp──> sunucu: lr-v2-vast.tar (137 MB)
 sunucu: setup.sh   (Drive'dan indir, doğrula, aç, kur)        ~15-30 dk
 sunucu: check.sh   (pytest, preflight, GPU bellek ölçümü)      ~15 dk
 sunucu: train.sh full                                          günler
-sunucu: finish.sh  (test seti, model paketi)                   ~30 dk
+sunucu: finish.sh  (test seti, model paketi)                   ~30-60 dk
 sunucu ──scp──> laptop: tr-vsr-model.tar     → sunucuyu kapat (Destroy)
 ```
 
@@ -33,14 +35,28 @@ Birden fazla GPU'lu sunucu almayın: kod tek GPU kullanır.
 
 ## 1. Sunucuya ne indirilecek
 
-`setup.sh` aşağıdaki dosyaları tek tek indirir. Hepsi aynı Drive klasöründedir:
+`setup.sh` aşağıdaki dosyaları sırayla, Drive ID'leriyle indirir
+(`DRIVE_FILES.txt`). Hepsi aynı Drive klasöründedir:
 <https://drive.google.com/drive/folders/16tybAQsivB4GPGB2piDDpuoSJeWToBCS>
 
-| # | Dosya | Boyut | Ne | Sunucuda nereye | sha256 |
-|---|---|---|---|---|---|
-| 1 | [`tr-lrs-v3.tar.gz`](https://drive.google.com/file/d/15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC/view) | 12,9 GB | TR-LRS v3: 225.977 ağız kırpıntısı klip (96x96, 25 fps), manifest'ler, tokenizer | açılır: `lr-v2-codebase/dataset/`; tar silinir | `143122937a84a16748a8b22b415d3d49b993c522f44a2b8842eb46d1dda55b8e` |
-| 2 | [`wheelhouse-py312-cu129.tar`](WHEELHOUSE_LINK) | 4,3 GB | 63 Python paketi (wheel), PyTorch 2.13.0+cu129 dahil; internetsiz kurulum | `.venv` içine kurulur; tar kalır | `bc8f44ecf8d5218c23aa5ed3675350457758927b572d74675c7afa1325c06e03` |
-| 3 | [`vsr_trlrs2lrs3vox2avsp_base.pth`](PRETRAINED_LINK) | 1,0 GB | Auto-AVSR (Ma ve ark.) görsel konuşma tanıma ağırlıkları, başlangıç noktası | `lr-v2-codebase/pretrained/` | `fbf7cd70ff1c0e694b3030fb779dbb4570f04e4b841d62f9296c229e94878ddb` |
+| # | Dosya | Boyut | Ne | Sunucuda nereye |
+|---|---|---|---|---|
+| 1 | [`tr-lrs-v3.tar.gz`](https://drive.google.com/file/d/15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC/view) | 12,9 GB | TR-LRS v3: 225.977 ağız kırpıntısı klip (96x96, 25 fps), manifest'ler, tokenizer | açılır: `lr-v2-codebase/dataset/`; tar silinir |
+| 2 | [`vsr_trlrs2lrs3vox2avsp_base.pth`](https://drive.google.com/file/d/162axOfnnZxVfhpbm9XK4SKAo_l3Qdpf_/view) | 1,0 GB | Auto-AVSR (Ma ve ark.) görsel konuşma tanıma ağırlıkları, başlangıç noktası | `lr-v2-codebase/pretrained/` |
+{{PART_ROWS}}
+
+Wheelhouse 4,3 GB'lık tek bir tar (`wheelhouse-py312-cu129.tar`): 63
+Python paketi (wheel), PyTorch 2.13.0+cu129 dahil. Drive'a yüklenirken
+kesilmemesi için 5 parçaya bölündü (`split -b 900M`); `setup.sh`
+parçaları `cat` ile birleştirir ve tam tar'ı doğrular.
+
+sha256 (`SHA256SUMS.drive`):
+
+```
+143122937a84a16748a8b22b415d3d49b993c522f44a2b8842eb46d1dda55b8e  tr-lrs-v3.tar.gz
+bc8f44ecf8d5218c23aa5ed3675350457758927b572d74675c7afa1325c06e03  wheelhouse-py312-cu129.tar
+fbf7cd70ff1c0e694b3030fb779dbb4570f04e4b841d62f9296c229e94878ddb  vsr_trlrs2lrs3vox2avsp_base.pth
+```
 
 Paketin kendi içinden gelenler (indirme yok):
 
@@ -49,9 +65,10 @@ Paketin kendi içinden gelenler (indirme yok):
 | `code.tar` | Kod, git commit'i `COMMIT` dosyasında. `lr-v2-codebase/` olarak açılır |
 | `assets/` | `babble_noise.wav` (ses gürültüsü), `face_landmarker.task` (yüz noktaları; yalnızca model kullanımında gerekir) |
 | `bin/python-3.12.tar.gz` | Taşınabilir Python 3.12.16 (python-build-standalone); sistem Python'u kullanılmaz |
-| `bin/rclone` | rclone 1.75.2, Drive'dan indirmek için |
+| `bin/gdown-wheels/` | gdown 6.5.1 ve bağımlılıkları (12 wheel), internetsiz kurulur |
+| `DRIVE_FILES.txt` | İndirilecek dosyaların Drive ID'leri |
 | `requirements-lock.txt` | Kurulan paketlerin kesin sürümleri |
-| `SHA256SUMS.drive` | Yukarıdaki 3 Drive dosyasının sha256 değerleri |
+| `SHA256SUMS.drive` | Drive dosyalarının sha256 değerleri |
 | `SHA256SUMS.bundle` | Paketin içindeki dosyaların sha256 değerleri |
 | `MODEL_KULLANIMI.md` | Eğitilen modeli kullanma rehberi; `finish.sh` model paketine koyar |
 
@@ -70,8 +87,8 @@ $WORK/                         /workspace (yoksa /root)
     exp/vsr_finetune/          eğitim çıktısı (checkpoint'ler, metrikler)
     logs/
   python/                      taşınabilir Python
+  tools/                       gdown
   downloads/                   wheelhouse tar'ı, pretrained'in kopyası
-  bin/rclone
 ```
 
 ## 2. Laptoptan sunucuya yükleme
@@ -82,48 +99,49 @@ vast.ai panelindeki "Connect" düğmesi SSH komutunu verir:
 ```bash
 cd ~/Desktop
 sha256sum -c lr-v2-vast.tar.sha256
-scp -P <port> lr-v2-vast.tar ~/.config/rclone/rclone.conf root@<adres>:/root/
+scp -P <port> lr-v2-vast.tar root@<adres>:/root/
 ```
-
-`rclone.conf`, Drive hesabına (`gdrive` bağlantısı) erişim anahtarını
-taşır. Paketin içine bilerek konmadı. Sunucu kapatılınca (Destroy) silinir.
 
 ## 3. Kurulum
 
 ```bash
 ssh -p <port> root@<adres>
-cd /root && tar -xf lr-v2-vast.tar && mv rclone.conf lr-v2-vast/ && cd lr-v2-vast
+cd /root && tar -xf lr-v2-vast.tar && cd lr-v2-vast
 bash setup.sh
 ```
 
-`setup.sh` dört adımı sırayla yapar ve her adımı bitince işaretler. Bir
-yerde durursa sorunu giderip yeniden çalıştırın; bitmiş adımlar atlanır.
+`setup.sh` beş adımı sırayla yapar ve her adımı bitince işaretler. Bir
+yerde durursa sorunu giderip yeniden çalıştırın; bitmiş adımlar atlanır,
+yarım kalan indirme kaldığı yerden sürer.
 
-1. **Kontrol:** `nvidia-smi`, sürücünün CUDA sürümü, boş disk, rclone ayarı
-2. **İndirme:** 1. bölümdeki üç dosya, ardından `sha256sum -c SHA256SUMS.drive`
-3. **Açma:** kod, assets, ağırlıklar; dataset açılır, oturum (39) ve dosya
+1. **Kontrol:** `nvidia-smi`, sürücünün CUDA sürümü, boş disk
+2. **Python ve gdown:** taşınabilir Python 3.12, gdown paketin içinden
+3. **İndirme:** 1. bölümdeki dosyalar gdown ile; wheelhouse parçaları
+   birleştirilir; `sha256sum -c SHA256SUMS.drive`
+4. **Açma:** kod, assets, ağırlıklar; dataset açılır, oturum (39) ve dosya
    (451.954) sayısı kontrol edilir, dataset tar'ı silinir
-4. **Python:** taşınabilir Python 3.12 → `.venv` → wheelhouse'tan internetsiz
-   `pip install`; sonunda PyTorch'un GPU'da işlem yaptığı denenir
+5. **Kütüphaneler:** `.venv` → wheelhouse'tan internetsiz `pip install`;
+   sonunda PyTorch'un GPU'da işlem yaptığı denenir
 
 Son satır `KURULUM TAMAM` olmalı.
 
 Elle yapmak isterseniz eşdeğer komutlar:
 
 ```bash
-export PATH=/workspace/bin:$PATH; mkdir -p /workspace/{bin,downloads}
-install -m 755 bin/rclone /workspace/bin/
-mkdir -p ~/.config/rclone && cp rclone.conf ~/.config/rclone/
-for f in tr-lrs-v3.tar.gz wheelhouse-py312-cu129.tar vsr_trlrs2lrs3vox2avsp_base.pth; do
-  rclone copy gdrive: /workspace/downloads --bind 0.0.0.0 \
-      --drive-root-folder-id 16tybAQsivB4GPGB2piDDpuoSJeWToBCS --include "/$f" -P
+mkdir -p /workspace/downloads && cd /workspace
+tar -xzf ~/lr-v2-vast/bin/python-3.12.tar.gz                    # /workspace/python
+python/bin/python3 -m venv tools
+tools/bin/pip install --no-index --find-links ~/lr-v2-vast/bin/gdown-wheels gdown
+cd downloads
+grep -v '^#' ~/lr-v2-vast/DRIVE_FILES.txt | while read -r id name; do
+  /workspace/tools/bin/gdown "$id" -O "$name" --continue --retries 5
 done
-(cd /workspace/downloads && sha256sum -c ~/lr-v2-vast/SHA256SUMS.drive)
+cat wheelhouse-py312-cu129.tar.part-* > wheelhouse-py312-cu129.tar
+sha256sum -c ~/lr-v2-vast/SHA256SUMS.drive                      # üçü de OK
 mkdir -p /workspace/lr-v2-codebase/pretrained && cd /workspace/lr-v2-codebase
 tar -xf ~/lr-v2-vast/code.tar && cp -r ~/lr-v2-vast/assets .
 cp /workspace/downloads/vsr_trlrs2lrs3vox2avsp_base.pth pretrained/
-tar -xzf /workspace/downloads/tr-lrs-v3.tar.gz          # dataset/
-tar -xzf ~/lr-v2-vast/bin/python-3.12.tar.gz -C /workspace
+tar -xzf /workspace/downloads/tr-lrs-v3.tar.gz                  # dataset/
 /workspace/python/bin/python3 -m venv .venv
 mkdir -p /workspace/downloads/wh && tar -xf /workspace/downloads/wheelhouse-py312-cu129.tar -C /workspace/downloads/wh
 .venv/bin/pip install --no-index --find-links /workspace/downloads/wh -r ~/lr-v2-vast/requirements-lock.txt
@@ -234,12 +252,10 @@ Modeli kullanma: `tr-vsr-model/MODEL_KULLANIMI.md`.
 
 | Belirti | Çözüm |
 |---|---|
-| `rclone'da 'gdrive:' adında bir Drive bağlantısı yok` | 2. bölümdeki `scp` ile `rclone.conf`'u gönder, `lr-v2-vast/` içine koy |
-| rclone `token expired` / `invalid_grant` | Laptopta `rclone config reconnect gdrive:`, sonra conf'u tekrar gönder |
-| `network is unreachable` (IPv6) | İndirme `--bind 0.0.0.0` ile IPv4'e zorlanır; sürerse sunucuyu değiştir |
+| gdown `Too many users have viewed or downloaded this file recently` | Drive'ın dosya başına indirme kotası; birkaç saat sonra `bash setup.sh` (kaldığı yerden sürer) |
+| gdown `Cannot retrieve the public link` / `Access denied` | Drive klasörünün paylaşımı "Bağlantıya sahip olan herkes" olmalı |
 | sha256 `FAILED` | `rm -f /workspace/.setup-done/download /workspace/downloads/<dosya>`, `bash setup.sh` |
 | `PyTorch GPU'yu göremiyor` | Sürücü CUDA 12.8'den eski: başka sunucu seç |
-| Drive günlük indirme kotası (`downloadQuotaExceeded`) | Birkaç saat bekle ya da dosyayı Drive'da kopyalayıp ID'yi değiştir |
 | Disk doldu | `df -h /workspace`; `downloads/wheelhouse-py312-cu129.tar` silinebilir |
 
 ## Paketin yeniden yapılması (laptopta)
@@ -250,11 +266,18 @@ Kod değişirse, commit edip:
 bash deploy/vast/make_bundle.sh ~/Desktop/vast-bundle-build ~/Desktop/lr-v2-vast.tar
 ```
 
-`~/Desktop/vast-bundle-build/bin/` içinde `rclone` ve `python-3.12.tar.gz`
-bulunmalı. Wheelhouse yalnızca `requirements-lock.txt` değişirse yeniden
+`~/Desktop/vast-bundle-build/bin/` içinde `python-3.12.tar.gz` ve
+`gdown-wheels/` bulunmalı. Wheelhouse yalnızca `requirements-lock.txt` değişirse yeniden
 yapılır ve Drive'a yüklenir:
 
 ```bash
 python3.12 -m pip wheel -w wheelhouse -r requirements-lock.txt \
     --extra-index-url https://download.pytorch.org/whl/cu129
+tar -cf wheelhouse-py312-cu129.tar -C wheelhouse .
+split -b 900M -d -a 2 wheelhouse-py312-cu129.tar wheelhouse-py312-cu129.tar.part-
 ```
+
+Sonra parçaları Drive klasörüne yükle, yeni ID'leri `DRIVE_FILES.txt`'ye ve
+tar'ın sha256'sını `SHA256SUMS.drive`'a yaz. Tek 4 GB'lık dosya halinde
+yükleme, rclone'un ortak Google kotası yüzünden son adımda tekrar tekrar
+başa dönmüştü (1 Kasım 2026).

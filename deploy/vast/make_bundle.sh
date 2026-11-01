@@ -4,7 +4,7 @@
 #   bash deploy/vast/make_bundle.sh <yapım klasörü> <çıktı tar>
 #
 # Yapım klasöründe önceden hazırlanmış olmalı (README'deki "paketin yeniden
-# yapılması" bölümü): bin/rclone, bin/python-3.12.tar.gz. Büyük dosyalar
+# yapılması" bölümü): bin/python-3.12.tar.gz, bin/gdown-wheels/. Büyük dosyalar
 # (dataset, wheelhouse, pretrained) pakete girmez; Drive'dan indirilir.
 set -euo pipefail
 
@@ -19,10 +19,10 @@ fi
 
 STAGE=$BUILD/lr-v2-vast
 rm -rf "$STAGE" && mkdir -p "$STAGE/bin"
-cp deploy/vast/{setup.sh,check.sh,train.sh,finish.sh,drive.env,SHA256SUMS.drive,requirements-lock.txt} "$STAGE/"
+cp deploy/vast/{setup.sh,check.sh,train.sh,finish.sh,drive.env,DRIVE_FILES.txt,SHA256SUMS.drive,requirements-lock.txt} "$STAGE/"
 cp deploy/vast/README.md "$STAGE/KURULUM.md"
 cp deploy/vast/MODEL_KULLANIMI.md "$STAGE/"
-cp "$BUILD/bin/rclone" "$BUILD/bin/python-3.12.tar.gz" "$BUILD/bin/cacert.pem" "$STAGE/bin/"
+cp "$BUILD/bin/python-3.12.tar.gz" "$STAGE/bin/" && cp -r "$BUILD/bin/gdown-wheels" "$STAGE/bin/"
 cp -r assets "$STAGE/assets"
 git archive --format=tar HEAD > "$STAGE/code.tar"
 git rev-parse HEAD > "$STAGE/COMMIT"

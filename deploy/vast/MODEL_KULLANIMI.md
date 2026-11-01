@@ -90,8 +90,9 @@ Video ne olmalı:
 - Yüz yüksekliği en az ~50 piksel (alın-çene). Çözünürlük ve fps serbest:
   1080p geniş planlardaki küçük yüzler de döşemeli aramayla bulunur, video
   25 fps'e çevrilir, yüz eğitimdeki ölçeğe küçültülür.
-- Görüntü işleme CPU'da yapılır: 1080p'de 7 saniyelik video için ~1 dakika
-  (16 çekirdek). Model GPU'da hızlıdır.
+- Hız (laptop, RTX 2060 + 16 çekirdek, ölçüldü): 7 saniyelik 1080p video
+  ~8-10 saniye (yüz bulma CPU'da, model GPU'da) + bir kerelik ~5 saniye
+  model yükleme. GPU'suz (`--cpu`) aynı video ~1 dakika.
 - Model meclis konuşmalarıyla eğitildi: resmi, hitabet tarzı konuşmada en
   iyi sonucu verir. Günlük konuşma, farklı ışık ve kamera açılarında hata artar.
 - Ses dosyası gerekmez; varsa kullanılmaz.
