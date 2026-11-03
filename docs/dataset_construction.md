@@ -39,7 +39,7 @@ with start time, end time and confidence.
 | Property | Value |
 |---|---|
 | Content | TBMM TV (Meclis TV) broadcasts of the plenary sessions of the Grand National Assembly of Türkiye |
-| Recordings | 39: 19 from the assembly's own archive (`<term>-birlesim-<n>`), 20 downloaded from YouTube uploads of the same TBMM TV broadcasts (`yt-<video id>`) |
+| Recordings | 39, all downloaded from YouTube uploads of TBMM TV broadcasts: 19 named after the session (`<term>-birlesim-<n>`), 20 after the YouTube video (`yt-<video id>`) |
 | Length | 332.4 hours; 4.4 to 11.6 hours per recording |
 | Video | 1920x1080, 30 frames per second, H.264 |
 | Audio | AAC, 44.1 kHz stereo (downloads) or as broadcast; converted to 16 kHz mono |
@@ -318,7 +318,7 @@ clips; it is applied during training with a new mask every epoch.
 
 | Split | Definition |
 |---|---|
-| Test | all clips of the recordings `2025-2026-birlesim-3` (archive) and `yt-NPJohShU_iw` (YouTube) |
+| Test | all clips of the recordings `2025-2026-birlesim-3` and `yt-NPJohShU_iw` |
 | Validation | the last 5 % of the kept clips of every other recording |
 | Training | the remaining clips |
 
@@ -359,25 +359,25 @@ removed by R1 to R4, "no face" the share removed by the video checks.
 
 | Recording | Source | Video h | Utterances | Kept | Kept | Hours | Recurrent | Low conf. | No face | Split |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 2024-2025-birlesim-72 | archive | 9.2 | 8,092 | 6,905 | 85.3 % | 6.95 | 0.6 % | 2.0 % | 11.6 % | train, val |
-| 2024-2025-birlesim-73 | archive | 8.7 | 5,938 | 4,762 | 80.2 % | 5.32 | 0.8 % | 2.1 % | 15.3 % | train, val |
-| 2024-2025-birlesim-74 | archive | 8.2 | 6,619 | 5,551 | 83.9 % | 5.70 | 0.3 % | 2.6 % | 12.4 % | train, val |
-| 2024-2025-birlesim-76 | archive | 7.7 | 6,610 | 5,416 | 81.9 % | 5.39 | 0.4 % | 1.8 % | 14.6 % | train, val |
-| 2024-2025-birlesim-80 | archive | 4.4 | 3,546 | 2,912 | 82.1 % | 2.93 | 0.8 % | 2.6 % | 12.3 % | train, val |
-| 2024-2025-birlesim-82 | archive | 9.3 | 8,081 | 6,669 | 82.5 % | 6.35 | 0.7 % | 2.3 % | 13.5 % | train, val |
-| 2024-2025-birlesim-84 | archive | 8.8 | 7,076 | 6,121 | 86.5 % | 6.60 | 0.4 % | 1.8 % | 10.0 % | train, val |
-| 2024-2025-birlesim-94 | archive | 11.3 | 6,948 | 5,204 | 74.9 % | 5.15 | 0.9 % | 2.2 % | 18.8 % | train, val |
-| 2024-2025-birlesim-109 | archive | 11.2 | 8,441 | 6,781 | 80.3 % | 6.88 | 1.2 % | 2.6 % | 13.9 % | train, val |
-| 2024-2025-birlesim-110 | archive | 11.6 | 8,297 | 6,514 | 78.5 % | 6.30 | 0.8 % | 2.6 % | 16.9 % | train, val |
-| 2025-2026-birlesim-1 | archive | 8.5 | 6,415 | 5,099 | 79.5 % | 5.30 | 0.7 % | 2.4 % | 15.5 % | train, val |
-| 2025-2026-birlesim-2 | archive | 6.7 | 5,721 | 4,952 | 86.6 % | 4.90 | 0.7 % | 2.6 % | 9.4 % | train, val |
-| 2025-2026-birlesim-3 | archive | 4.8 | 3,848 | 3,129 | 81.3 % | 3.31 | 0.5 % | 2.5 % | 15.0 % | test |
-| 2025-2026-birlesim-5 | archive | 8.1 | 7,182 | 6,104 | 85.0 % | 5.87 | 0.7 % | 2.9 % | 10.1 % | train, val |
-| 2025-2026-birlesim-7 | archive | 7.9 | 6,402 | 5,493 | 85.8 % | 5.43 | 1.0 % | 1.7 % | 11.0 % | train, val |
-| 2025-2026-birlesim-8 | archive | 8.0 | 6,269 | 5,087 | 81.1 % | 5.08 | 0.6 % | 2.4 % | 14.6 % | train, val |
-| 2025-2026-birlesim-9 | archive | 8.0 | 6,177 | 5,321 | 86.1 % | 5.87 | 0.5 % | 2.0 % | 10.6 % | train, val |
-| 2025-2026-birlesim-10 | archive | 10.4 | 7,688 | 5,900 | 76.7 % | 6.07 | 0.6 % | 3.1 % | 17.3 % | train, val |
-| 2025-2026-birlesim-12 | archive | 7.2 | 5,313 | 4,072 | 76.6 % | 4.35 | 0.5 % | 2.8 % | 19.0 % | train, val |
+| 2024-2025-birlesim-72 | birlesim | 9.2 | 8,092 | 6,905 | 85.3 % | 6.95 | 0.6 % | 2.0 % | 11.6 % | train, val |
+| 2024-2025-birlesim-73 | birlesim | 8.7 | 5,938 | 4,762 | 80.2 % | 5.32 | 0.8 % | 2.1 % | 15.3 % | train, val |
+| 2024-2025-birlesim-74 | birlesim | 8.2 | 6,619 | 5,551 | 83.9 % | 5.70 | 0.3 % | 2.6 % | 12.4 % | train, val |
+| 2024-2025-birlesim-76 | birlesim | 7.7 | 6,610 | 5,416 | 81.9 % | 5.39 | 0.4 % | 1.8 % | 14.6 % | train, val |
+| 2024-2025-birlesim-80 | birlesim | 4.4 | 3,546 | 2,912 | 82.1 % | 2.93 | 0.8 % | 2.6 % | 12.3 % | train, val |
+| 2024-2025-birlesim-82 | birlesim | 9.3 | 8,081 | 6,669 | 82.5 % | 6.35 | 0.7 % | 2.3 % | 13.5 % | train, val |
+| 2024-2025-birlesim-84 | birlesim | 8.8 | 7,076 | 6,121 | 86.5 % | 6.60 | 0.4 % | 1.8 % | 10.0 % | train, val |
+| 2024-2025-birlesim-94 | birlesim | 11.3 | 6,948 | 5,204 | 74.9 % | 5.15 | 0.9 % | 2.2 % | 18.8 % | train, val |
+| 2024-2025-birlesim-109 | birlesim | 11.2 | 8,441 | 6,781 | 80.3 % | 6.88 | 1.2 % | 2.6 % | 13.9 % | train, val |
+| 2024-2025-birlesim-110 | birlesim | 11.6 | 8,297 | 6,514 | 78.5 % | 6.30 | 0.8 % | 2.6 % | 16.9 % | train, val |
+| 2025-2026-birlesim-1 | birlesim | 8.5 | 6,415 | 5,099 | 79.5 % | 5.30 | 0.7 % | 2.4 % | 15.5 % | train, val |
+| 2025-2026-birlesim-2 | birlesim | 6.7 | 5,721 | 4,952 | 86.6 % | 4.90 | 0.7 % | 2.6 % | 9.4 % | train, val |
+| 2025-2026-birlesim-3 | birlesim | 4.8 | 3,848 | 3,129 | 81.3 % | 3.31 | 0.5 % | 2.5 % | 15.0 % | test |
+| 2025-2026-birlesim-5 | birlesim | 8.1 | 7,182 | 6,104 | 85.0 % | 5.87 | 0.7 % | 2.9 % | 10.1 % | train, val |
+| 2025-2026-birlesim-7 | birlesim | 7.9 | 6,402 | 5,493 | 85.8 % | 5.43 | 1.0 % | 1.7 % | 11.0 % | train, val |
+| 2025-2026-birlesim-8 | birlesim | 8.0 | 6,269 | 5,087 | 81.1 % | 5.08 | 0.6 % | 2.4 % | 14.6 % | train, val |
+| 2025-2026-birlesim-9 | birlesim | 8.0 | 6,177 | 5,321 | 86.1 % | 5.87 | 0.5 % | 2.0 % | 10.6 % | train, val |
+| 2025-2026-birlesim-10 | birlesim | 10.4 | 7,688 | 5,900 | 76.7 % | 6.07 | 0.6 % | 3.1 % | 17.3 % | train, val |
+| 2025-2026-birlesim-12 | birlesim | 7.2 | 5,313 | 4,072 | 76.6 % | 4.35 | 0.5 % | 2.8 % | 19.0 % | train, val |
 | yt-1DIP6Ruvtgg | YouTube | 10.4 | 8,262 | 6,751 | 81.7 % | 6.23 | 0.6 % | 2.0 % | 14.6 % | train, val |
 | yt-45SXDKapxh8 | YouTube | 6.8 | 6,048 | 5,241 | 86.7 % | 4.96 | 0.5 % | 1.8 % | 9.9 % | train, val |
 | yt-Fpah9dtIsFo | YouTube | 7.2 | 5,905 | 4,992 | 84.5 % | 5.16 | 0.4 % | 1.9 % | 12.9 % | train, val |

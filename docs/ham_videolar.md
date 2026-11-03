@@ -5,14 +5,14 @@ TR-LRS v3, bu belgedeki 39 oturumun ham kayıtlarından üretildi (`videos/`, to
 Bu belge oturumların nereden geldiğini, nasıl indirildiğini ve yeniden indirilen bir dosyanın aynı olup olmadığının
 nasıl kontrol edileceğini kaydeder.
 
-**Kaynak:** 39 kaydın tamamı TBMM TV (Meclis TV) Genel Kurul yayınlarıdır. 20'si bu yayınların
+**Kaynak:** 39 kaydın tamamı TBMM TV (Meclis TV) Genel Kurul yayınlarıdır ve hepsi bu yayınların
 YouTube'daki yüklemelerinden indirildi. Bu yüzden dataset'e kaynak olarak TBMM TV gösterilmelidir; YouTube
 linkleri sadece dosyaların nereden indirildiğini kaydeder.
 
 Kaynak tablo `videos/sources.tsv` dosyasıdır; bir kopyası `docs/ham_videolar_sources.tsv` olarak burada duruyor. Bu dosya `python dataset-creation/corpus.py ingest` ile üretilir ve
 tablolar ondan kopyalanmıştır.
 
-## TBMM TV yayınları, YouTube'dan indirilen: 20 oturum, 172.6 saat, 82.2 GB
+## YouTube video ID'siyle adlandırılanlar: 20 oturum, 172.6 saat, 82.2 GB
 
 Oturum adı `yt-<video id>` biçimindedir.
 
@@ -66,12 +66,12 @@ Bu listeyi yukarıdaki komuta `-a yt_links.txt` ile ver.
 `./yt-dlp_linux -a ./links.txt -f "best" -o "%(id)s.%(ext)s" --extractor-args "youtube:player_client=android" --download-archive downloaded.txt -N 8 --ignore-errors`.
 Bu komut 360p indirir, v3 için kullanılmadı.
 
-## TBMM TV yayınları, TBMM arşivinden: 19 oturum, 159.9 saat, 98.1 GB
+## Birleşim numarasıyla adlandırılanlar: 19 oturum, 159.9 saat, 98.1 GB
 
-TBMM Genel Kurul kayıtları. Oturum adı `<yasama yılı>-birlesim-<birleşim no>` biçimindedir, örneğin
-`2024-2025-birlesim-72` = 2024-2025 yasama yılı, 72. birleşim. **İndirme linkleri hiçbir yerde kaydedilmemiş**
-(`sources.tsv` dosyasındaki url sütunu boş). Kayıtlar TBMM TV Genel Kurul arşivinden (tv.tbmm.gov.tr) yasama yılı ve
-birleşim numarasıyla bulunabilir. Eski `video-N` adları ile bu adlar arasındaki eşleşme
+Bunlar da YouTube'dan indirilen TBMM TV Genel Kurul yayınlarıdır, ama dosyalar birleşime göre yeniden adlandırılmıştır. Oturum adı `<yasama yılı>-birlesim-<birleşim no>` biçimindedir, örneğin
+`2024-2025-birlesim-72` = 2024-2025 yasama yılı, 72. birleşim. **YouTube linkleri kaydedilmemiş**
+(`sources.tsv` dosyasındaki url sütunu boş). Videolar YouTube'da TBMM Genel Kurulu yüklemeleri arasında yasama yılı,
+birleşim numarası ve tarihle bulunabilir; doğru video olduğunu süre ve boyut (aşağıdaki tablo) doğrular. Eski `video-N` adları ile bu adlar arasındaki eşleşme
 `docs/audit_and_roadmap_2026-10-17.md` bölüm 6'da var.
 
 | Oturum | Link | Çözünürlük | Saat | Boyut (GB) | sha256 |

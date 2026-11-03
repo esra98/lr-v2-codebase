@@ -20,7 +20,7 @@ comparison.
 
 | | |
 |---|---|
-| Source | TBMM TV (Meclis TV) broadcasts of the plenary sessions of the Grand National Assembly of Türkiye: 39 recordings, 20 of them downloaded from YouTube uploads of the broadcasts |
+| Source | TBMM TV (Meclis TV) broadcasts of the plenary sessions of the Grand National Assembly of Türkiye: 39 recordings, all downloaded from YouTube uploads of the broadcasts |
 | Clips | 225,977 sentences |
 | Length | 224.6 hours. Clips last 0.5 to 10 s, typically 3 s |
 | Video | 96x96 mouth crop at 25 fps, with the 16 kHz mono audio in the same mp4 |
