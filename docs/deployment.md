@@ -40,7 +40,7 @@ the pretrained weights and two binary assets are not in git and are uploaded.
 
 ```
 ~/tr-lipreading/                     project folder (git clone)
-  avsr/ training/ training/configs/ tests/ docs/     code, from git
+  avsr/ dataset-creation/ training/ tests/ docs/     code, from git
   requirements.txt
   assets/                             from tr-lrs-support.tar
     babble_noise.wav                    noise for audio augmentation

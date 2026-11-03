@@ -1,299 +1,269 @@
-# Turkish visual and audio-visual speech recognition
+# tr-lipreading: Turkish lip reading
 
-Sentence-level speech recognition from video, with or without audio, for the
-TR-LRS corpus (Turkish Grand National Assembly recordings). The starting point
-is Pingchuan Ma's Auto-AVSR; the goal is to improve on it, with every change
-behind a switch so it can be A/B tested against the original behaviour.
+Turkish sentence-level lip reading (visual speech recognition): the model sees
+only the speaker's mouth and writes what was said. This repository holds the
+three parts of the project:
 
-One setting selects the mode:
-
-| `model.modality` | Input | Task |
+| Part | Where | What it is |
 |---|---|---|
-| `video` | mouth crops | VSR (lip reading) |
-| `audio` | waveform | ASR |
-| `audiovisual` | both | AVSR |
+| **TR-LRS v3** dataset | Google Drive, unpacked into `dataset/` | 225,977 Turkish sentence clips, 224.6 hours |
+| Dataset construction | `dataset-creation/` | turns full-length recordings into the dataset |
+| Training | `training/` | fine-tunes Auto-AVSR on the dataset, evaluates it, runs it on any video |
 
-An audio-visual model can also be *evaluated* on video only, audio only or
-both (`decode.input_mode`), which is how a single unified model serves all
-three tasks.
+The model is Auto-AVSR (Ma et al., ICASSP 2023), fine-tuned from its public
+English checkpoint. The original Auto-AVSR code is kept in `reference/` for
+comparison.
 
-## Dataset: TR-LRS v3
+---
 
-225,977 Turkish sentence clips (224.6 hours, 39 recordings: TBMM general
-assembly sessions and YouTube), mouth crops 96x96 with 16 kHz audio and a
-transcript per clip; train / val / test 208,811 / 10,993 / 6,173.
+## 1. The dataset: TR-LRS v3
 
 | | |
 |---|---|
-| Download | [tr-lrs-v3.tar.gz](https://drive.google.com/file/d/15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC/view) (12.9 GB, Google Drive) |
-| Drive folder | https://drive.google.com/drive/folders/16tybAQsivB4GPGB2piDDpuoSJeWToBCS |
-| sha256 | `143122937a84a16748a8b22b415d3d49b993c522f44a2b8842eb46d1dda55b8e` |
+| Clips | 225,977 sentences from 39 recordings (19 TBMM general assembly sessions, 20 YouTube videos) |
+| Length | 224.6 hours. Clips last 0.5 to 10 s, typically 3 s |
+| Video | 96x96 mouth crop at 25 fps, with the 16 kHz mono audio in the same mp4 |
+| Text | one `.txt` per clip: the Whisper large-v3 transcript with per-word timings |
+| Split | train 208,811, validation 10,993, test 6,173 clips. The test set is two whole recordings that are not in training |
+| Size | 12.9 GB packed, 14 GB unpacked |
+
+### Download
+
+The archive is on Google Drive and anyone with the link can download it:
+[**tr-lrs-v3.tar.gz**](https://drive.google.com/file/d/15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC/view)
+(in [this folder](https://drive.google.com/drive/folders/16tybAQsivB4GPGB2piDDpuoSJeWToBCS)).
+From the command line, run these in the repository folder:
 
 ```bash
 pip install gdown
+mkdir -p dataset
 gdown 15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC -O dataset/tr-lrs-v3.tar.gz
 echo "143122937a84a16748a8b22b415d3d49b993c522f44a2b8842eb46d1dda55b8e  dataset/tr-lrs-v3.tar.gz" | sha256sum -c
-tar -xzf dataset/tr-lrs-v3.tar.gz -C .      # creates dataset/tr-lrs-v3/, manifests, tokenizer
-```
-
-Contents, format and checks: `DATASET.md`. How it was built:
-`docs/dataset_construction.md`; where the raw recordings came from:
-`docs/ham_videolar.md`. A 50-clip sample is in `dataset-creation/samples/`.
-
-## Layout
-
-The project has three parts: the code that builds the dataset, the code that
-trains on it, and the dataset itself. Both code parts use the shared `avsr/`
-library. Run every command from this folder (the project root).
-
-```
-dataset-creation/              recordings -> dataset
-  corpus.py                    pipeline: ingest, download, transcribe, segment, cut, build, verify
-  download_youtube_1080p.sh    re-download the YouTube sessions at 1080p
-  samples/                     50 clips of the dataset with their labels, to see the format
-training/                      dataset -> model
-  train.py evaluate.py         training and evaluation
-  transcribe.py export_model.py  inference on any video, model packaging
-  preflight.py benchmark_memory.py ab_test.py train_tokenizer.py
-  configs/                     base.yaml (every option), data/, model/ (tiny, small, base), exp/ (A/B), finetune/
-  vast/                        rented-GPU (vast.ai) setup, training and packaging scripts
-dataset/
-  tr-lrs-v3.tar.gz (+.sha256)  the dataset; unpacking it here creates the folders below
-  tr-lrs-v3/<session>/         the clips: <utt>.mp4 (96x96 mouth + 16 kHz audio), <utt>.txt
-  tr-lrs-v3.clips.tsv          every utterance with its verdict and split
-  tr-lrs-v3-manifests/         train / val / test manifests
-  tr-lrs-v3-tokenizer/         SentencePiece models
-avsr/                          shared library
-  corpus/       ingest, transcribe, segment, cut, build (used by dataset-creation)
-  text/         Turkish normalisation, label parsing, tokenizers
-  preprocess/   landmarks, trajectory smoothing, mouth cropping, audio/video I/O
-  data/         label rules, clip table, manifests, augmentation, batching
-  models/       model, Conformer encoder extensions, pretrained-weight loading
-  decoding/     joint CTC/attention beam search
-  training/     Lightning modules, schedule, weight averaging
-  espnet/       Transformer/Conformer building blocks from Auto-AVSR (Apache 2.0)
-docs/          how the corpus was built (dataset_construction.md, ham_videolar.md),
-               literature notes, findings, project report
-tests/         unit and end-to-end tests
-reference/      original Auto-AVSR and VSR-for-multiple-languages code (git submodules, pinned)
-pretrained/    Auto-AVSR starting weights;  exp/  training runs;  logs/
-videos/, work/ only while building the dataset: raw recordings and per-session state
-```
-
-Unpack the dataset before training:
-
-```bash
-(cd dataset && sha256sum -c tr-lrs-v3.tar.gz.sha256)
 tar -xzf dataset/tr-lrs-v3.tar.gz -C .
 ```
 
-`videos/`, `work/`, `dataset/`, `exp/` and `pretrained/` are not in git.
+The last command creates:
 
-The current dataset is `dataset/tr-lrs-v3` (October 2026): 39 recordings,
-225,977 clips, 224.6 hours, built as described in
-`docs/dataset_construction.md`. `DATASET.md` says where the archive is,
-how to unpack it and that this codebase was checked against it. The first corpus (September 2026, built
-from 224x224 face clips with the dotted and dotless I merged) and the
-scripts that built it are tagged `v2-dataset-2026-09-28` and described in
-`docs/archive/`.
+```
+dataset/
+  tr-lrs-v3/<recording>/<clip>.mp4 + <clip>.txt   the clips
+  tr-lrs-v3-manifests/train.tsv val.tsv test.tsv   which clip is in which split, with its normalised text
+  tr-lrs-v3-tokenizer/unigram1000.model            SentencePiece tokenizer used by training
+  tr-lrs-v3.clips.tsv                              all 272,258 candidate sentences, kept or rejected and why
+```
 
-## Setup
+To see the format without downloading anything, look at the 50 clips in
+`dataset-creation/samples/`. The training target is upper-case Turkish without
+punctuation, with numbers spelled out and İ and I kept apart
+(`1921` → `BİN DOKUZ YÜZ YİRMİ BİR`).
+
+### How it was made
+
+1. **Transcription.** Every recording is transcribed with Whisper large-v3,
+   with a timestamp for each word.
+2. **Segmentation.** Each transcript is split into sentences of at most
+   10 seconds. Sentences whose text is unreliable are rejected: repeated or
+   invented text, low confidence, text over silence, implausible speaking rate.
+3. **Cutting.** In each sentence the faces are tracked and the one whose lips
+   move is taken as the speaker. Their mouth is cut out at 96x96. Clips are
+   rejected when no face is visible or the face is too small.
+4. **Split.** The test set is two whole recordings. Validation is the last 5 %
+   of every other recording.
+
+All of it is run with `dataset-creation/corpus.py`. The full method is in
+[`docs/dataset_construction.md`](docs/dataset_construction.md). Where each
+recording came from (links, sizes, checksums) is in
+[`docs/ham_videolar.md`](docs/ham_videolar.md).
+
+---
+
+## 2. Training on your own machine
+
+### Setup
+
+You need Python 3.10 to 3.13 and an NVIDIA GPU. Install the PyTorch build that
+matches your driver first (see pytorch.org), then:
 
 ```bash
-python3 -m venv --system-site-packages .venv      # reuses the system PyTorch
-.venv/bin/pip install -r requirements-build.txt    # requirements.txt is enough for training only
-.venv/bin/python -m pytest                          # about 10 minutes
+git clone --recurse-submodules https://github.com/esra98/tr-lipreading.git
+cd tr-lipreading
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-`assets/face_landmarker.task` (MediaPipe) and `assets/babble_noise.wav`
-(audio augmentation) are not in git. The landmark model comes from
-`https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task`.
-Building the corpus also needs `ffmpeg`, `yt-dlp` (2026.08 or later, with
-`node` as its JavaScript runtime) and `faster-whisper`.
-
-## From recordings to a dataset
-
-A session is one recording: an assembly session (`2024-2025-birlesim-72.mp4`)
-or a YouTube upload (`yt-<id>.mp4`). Everything is driven by one script:
+Download the dataset as in section 1, then download the pretrained Auto-AVSR
+weights (1.0 GB), which are the starting point of training:
 
 ```bash
-# 1. Register the recordings: resolution, length, checksum -> videos/sources.tsv
-python dataset-creation/corpus.py ingest
-
-# 2. Fetch YouTube sessions at up to 1080p (resumable, replaces smaller files)
-python dataset-creation/corpus.py download --ids fP99G1PONhQ ...
-
-# 3. Transcribe, segment and cut, session by session (NVIDIA GPU for Whisper; the
-#    face detector runs on the Intel GPU for --gpu-workers of the --workers, CPU for the rest)
-python dataset-creation/corpus.py run --dataset dataset/tr-lrs-v3 --workers 7 --gpu-workers 4
-
-# 4. Clip table, split and manifests; then check the result
-python dataset-creation/corpus.py build --dataset dataset/tr-lrs-v3 --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
-python dataset-creation/corpus.py verify --dataset dataset/tr-lrs-v3
-
-# 5. Tokenizer, batch size, training, evaluation
-python training/train_tokenizer.py --manifest dataset/tr-lrs-v3-manifests/train.tsv --out-dir dataset/tr-lrs-v3-tokenizer
-python training/benchmark_memory.py -c training/configs/model/small.yaml model.modality=video
-python training/train.py -c training/configs/model/small.yaml model.modality=video exp_name=vsr_small
-python training/evaluate.py --run exp/vsr_small --average 10
+mkdir -p pretrained
+gdown 162axOfnnZxVfhpbm9XK4SKAo_l3Qdpf_ -O pretrained/vsr_trlrs2lrs3vox2avsp_base.pth
+echo "fbf7cd70ff1c0e694b3030fb779dbb4570f04e4b841d62f9296c229e94878ddb  pretrained/vsr_trlrs2lrs3vox2avsp_base.pth" | sha256sum -c
 ```
 
-`run` is `transcribe`, `segment` and `cut`, which can also be called one at a
-time; `status` lists what is done per session. Every stage is resumable:
-transcription per 20-minute chunk, cutting per utterance, and a stage runs
-again only when its inputs or options changed (`work/<session>/status.json`).
-After a download, run `ingest` again before `run`: a session whose
-`sources.tsv` entry is still below 720p is transcribed but not cut.
-`cut --retry-errors` cuts only the utterances whose verdict is `error`.
-
-| Stage | Input | Output | What it does |
-|---|---|---|---|
-| transcribe | `videos/<s>.mp4` | `work/<s>/transcript.json` | `faster-whisper large-v3` with word times and confidences, in Whisper's own casing; `no_speech_prob`, `avg_logprob`, `compression_ratio` per segment |
-| segment | transcript | `work/<s>/segments.tsv` | utterances: cut at sentence ends and pauses over 0.4 s, at most 10 s (split at the longest pause), at least 2 words; the text rules below give each one a verdict |
-| cut | video + segments | `dataset/<name>/<s>/`, `work/<s>/clips.tsv`, `work/<s>/landmarks/` | one sequential decode; frames nearest the 25 fps grid; up to 4 faces found by a tiled search (MediaPipe alone misses 200 to 300 px faces in a 1080p frame), tracked through the clip, and the **speaker chosen by lip motion**; 96x96 mouth crop with the utterance's 16 kHz mono audio in one mp4 |
-| build | all `clips.tsv` | clip table, manifests | whole held-out sessions as the test set, the last 5 % of every other session as validation |
-
-### The clips
-
-```
-dataset/tr-lrs-v3/
-  2024-2025-birlesim-72/
-    00000.mp4     96x96 mouth crop at 25 fps (stream 0), 16 kHz mono AAC (stream 1)
-    00000.txt     Text: line in Whisper's casing, then WORD start end confidence per word
-    00003.mp4     utterance numbers are those of segments.tsv; rejected ones leave gaps
-```
-
-The training target is the normalised text of the clip table: upper case
-with Turkish casing (`i` -> `İ`, `ı` -> `I`, 29 letters plus Q, W, X),
-digits spelled out, punctuation removed. Partition-Time Masking is applied
-during training (`augment.video.ptm`), not written into the clips.
-`training/configs/base.yaml` points at this dataset and its tokenizer.
-
-### Mouth crop
-
-| Setting | Default | Meaning |
-|---|---|---|
-| `--roi-scale` | 0.63 | side of the crop as a fraction of face height; 0.63 shows the area of the 96 px Auto-AVSR crop |
-| `--smoothing` | `kalman` | smoothing of the crop position: `kalman` (with backward pass), `moving_average` (Auto-AVSR), `one_euro` (causal), `none` |
-| `--out-size` | 96 | side of the stored frames |
-| `--variant` | `mouth` | `face` writes a square face crop instead (`--out-size 224 --roi-scale 1.3`) |
-
-Scale comes from the forehead-to-chin distance, one value per clip. The
-speaker is the tracked face whose lip opening varies most among the faces at
-least half as tall as the tallest; close-ups in the chamber regularly show a
-listener beside the speaker. During training a random 88x88 crop is taken
-from the stored frames (a centre crop in evaluation).
-
-## Which utterances are kept
-
-| Check | Catches |
-|---|---|
-| Same transcript as an utterance at most 5 positions away | invented sentences, which come in runs |
-| Sentence that mostly occurs in runs within its session | the stray occurrences of such a sentence |
-| Word or short phrase looping inside the transcript | `DA DA DA DA ...` |
-| Known invented phrase making up half of the transcript or more | subtitle credits such as `ALTYAZI M.K.` |
-| Words too short for their length, in over 25 % of words | words squeezed into one timestamp tick |
-| Mean / minimum word confidence below 0.80 / 0.30 | uncertain transcripts |
-| Whisper's `no_speech_prob` above 0.6 | text invented over silence or noise |
-| Speaking rate outside 4 to 25 letters per second | text that does not fit the span |
-| Shorter than 12 frames or longer than 600 | |
-| Face found in under 80 % of frames, or face under 50 px tall | wide shots of the chamber, occlusions |
-
-Genuine phrases that are merely frequent, such as `TEŞEKKÜR EDERİM`, are kept:
-they are spread over the recordings instead of bunched together. The clip
-table lists every utterance with its verdict. On the 39 recordings the text
-rules remove 4.0 % of the utterances and the video checks 13.0 %, nearly all
-of them shots without a visible face.
-
-## Model options
-
-| Option | Values | Meaning |
-|---|---|---|
-| `model.fusion.type` | `late_mlp` | one Conformer per modality, outputs merged by an MLP (Auto-AVSR) |
-| | `early_shared` | features merged before one shared Conformer; usable on either modality alone |
-| `train.input_mode_probs` | `[video, audio, audiovisual]` | chance of training a batch on each input mode |
-| `model.interctc.layers` | e.g. `[3, 6, 9]` | intermediate CTC losses |
-| `model.interctc.self_condition` | bool | feed intermediate predictions back into the encoder |
-| `model.layer_drop` | 0 to 1 | stochastic depth |
-| `model.mask_conv_padding` | bool | keep padded frames out of the Conformer convolutions |
-| `model.pretrained.path` / `.scope` | `frontend`, `encoder`, `full` | initialise from an Auto-AVSR checkpoint |
-| `model.freeze` | `none`, `frontend`, `encoder` | parts that are not trained |
-| `train.pretrained_lr_scale` | 0 to 1 | learning rate of pretrained parts as a fraction of `train.lr` |
-| `train.hold_pretrained_epochs` | e.g. 1 | epochs during which pretrained parts are not changed |
-| `augment.video.ptm.*` | | Partition-Time Masking |
-| `augment.video.time_mask.*` | | adaptive time masking |
-| `augment.speed_range` | e.g. `[0.9, 1.1]` | playback-speed perturbation, audio and video in sync |
-| `train.ema_decay` | e.g. 0.999 | evaluate an exponential moving average of the weights |
-| `tokenizer.type` | `unigram`, `bpe`, `char` | output units |
-
-With the base preset and `model.mask_conv_padding=false` the model computes
-exactly what the original Auto-AVSR code computes from the same weights
-(`tests/test_reference_equivalence.py`; it needs the original code in the
-`reference/auto_avsr` submodule, `git submodule update --init`, or at
-`AUTO_AVSR_REFERENCE`, and skips when it is absent).
-
-## A/B experiments
-
-An experiment file lists arms (sets of overrides), a control arm and seeds:
-
-```bash
-python training/ab_test.py training/configs/exp/ptm.yaml --dry-run   # validate only
-python training/ab_test.py training/configs/exp/ptm.yaml             # run and report
-python training/ab_test.py training/configs/exp/ptm.yaml --report-only
-```
-
-Each run is its own process. Runs that already finished are skipped, so an
-interrupted experiment continues where it stopped. The report compares every
-arm with the control **paired by seed** and gives a 95 % confidence interval
-for the difference; a verdict is only stated when that interval excludes zero.
-
-## Robustness
-
-- A batch that runs out of GPU memory is skipped and counted
-  (`train/oom_batches`) instead of ending the run.
-- A clip that cannot be read is dropped from its batch with a warning.
-- The CTC loss is always computed in 32-bit, which avoids the all-blank
-  collapse seen with half precision.
-- Utterances with more tokens than frames are excluded, since CTC cannot
-  align them.
-- `train/amp_scale` is logged; a value that keeps falling means half-precision
-  overflow, and `train.precision=bf16-mixed` or `32-true` should be used.
-- Training resumes from `checkpoints/last.ckpt` with `--resume`.
-
-## Fine-tuning from the Auto-AVSR weights
-
-```bash
-python training/train.py -c training/configs/finetune/vsr_base.yaml exp_name=vsr_finetune
-```
-
-Pretrained parts are trained with a much lower learning rate than the new
-output layers (`train.pretrained_lr_scale`) and are held still at the start
-(`train.hold_pretrained_epochs`). With one learning rate for everything the
-model does not learn; see `docs/findings.md`.
-
-## Moving to a cloud GPU
-
-See `docs/deployment.md` (written for the first corpus; the folder is now
-`dataset/tr-lrs-v3` with its `-manifests` and `-tokenizer` folders next to
-it). In short: clone the code, unpack the dataset into `dataset/`, the
-support files into the project folder and the weights into `pretrained/`,
-install `requirements.txt`, and run
+Check that everything is in place. Run every command from the repository folder:
 
 ```bash
 python training/preflight.py -c training/configs/finetune/vsr_base.yaml
 ```
 
-which checks the server and ends with `READY TO TRAIN` or a list of what is
-wrong.
+It reads a sample of clips, loads the weights and the tokenizer, and runs
+20 real training steps. The last line should be `READY TO TRAIN`.
+
+### A short trial run (6 GB GPU)
+
+This run uses 8,000 clips and 3 epochs. It shows that fine-tuning starts and
+that the model learns, not a usable model:
+
+```bash
+python training/train.py -c training/configs/finetune/vsr_base.yaml \
+    -c training/configs/finetune/local_6gb.yaml exp_name=trial
+```
+
+On an RTX 2060 (6 GB) it takes about 75 minutes. The validation character
+error rate goes from about 0.68 after the first epoch to about 0.64 after the
+third.
+
+### Full training
+
+```bash
+python training/train.py -c training/configs/finetune/vsr_base.yaml exp_name=vsr_finetune
+```
+
+The recipe is the one of Auto-AVSR:
+
+- 75 epochs, AdamW, 5 warm-up epochs, then cosine decay
+- batches of up to 1,800 frames
+- 0.1 CTC + 0.9 attention loss
+- Partition-Time Masking as augmentation
+
+The new Turkish output layers learn at 1e-3 and the pretrained parts at 2e-5,
+held still for the first epoch. With one learning rate for everything the
+model does not learn ([`docs/findings.md`](docs/findings.md)).
+
+A batch of 1,800 frames needs about 48 GB of GPU memory. On a smaller GPU,
+halve the batch and accumulate two of them, so that the product stays 1,800:
+
+```bash
+python training/benchmark_memory.py -c training/configs/finetune/vsr_base.yaml --batch-frames 900 1800
+python training/train.py -c training/configs/finetune/vsr_base.yaml exp_name=vsr_finetune \
+    data.max_frames_per_batch=900 train.accumulate_grad_batches=2
+```
+
+The run is written to `exp/vsr_finetune/`: checkpoints, `config.yaml`,
+per-epoch metrics in `csv/`, and TensorBoard logs in `tb/`
+(`tensorboard --logdir exp`). Watch `val/cer`. After the first epoch it should
+be below 0.9 and then keep falling. If it stays above 0.9 for five epochs, the
+model is not learning. A stopped run continues with
+`--resume exp/vsr_finetune/checkpoints/last.ckpt`.
+
+### Evaluate, package, use
+
+```bash
+# Word and character error rate on the test set, with the last 10 checkpoints averaged
+python training/evaluate.py --run exp/vsr_finetune --average 10
+
+# A self-contained model folder: averaged weights, config, tokenizer, results
+python training/export_model.py --run exp/vsr_finetune --average 10 --out tr-vsr-model
+
+# Read the lips in any video
+pip install mediapipe opencv-python-headless
+wget -P assets https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
+python training/transcribe.py --run tr-vsr-model konusma.mp4
+```
+
+`transcribe.py` finds the speaker's face, cuts the mouth as in the dataset and
+prints the text, one line per 10 seconds of video. Add
+`--save-crop crop.mp4` to see the mouth crop the model sees.
+
+---
+
+## 3. Training on a rented GPU (vast.ai)
+
+The full training needs a large GPU for several days. Renting one on
+[vast.ai](https://vast.ai) costs much less than buying one. The scripts in
+[`training/vast/`](training/vast) automate everything below.
+[`training/vast/REMOTE_RUN.md`](training/vast/REMOTE_RUN.md) is the short
+guide to them (in Turkish).
+
+### Choosing the server
+
+| Setting | Value | Why |
+|---|---|---|
+| GPU | one GPU with 48 GB or more (RTX A6000, L40S, A100 80GB, H100) | holds the 1,800-frame batch. A 24 GB GPU works with the halved batch above. The code uses one GPU, so more than one is wasted |
+| CUDA (driver) | 12.8 or newer | for current PyTorch builds |
+| Disk | 100 GB | dataset 13 GB packed + 14 GB unpacked, libraries ~11 GB, checkpoints ~15 GB |
+| CPU / RAM | 16 cores / 32 GB | the clips are decoded on the CPU. With fewer cores the GPU waits |
+| Image | Ubuntu 22.04 with SSH | |
+
+### The run, step by step
+
+1. **Rent and connect.** The vast.ai console gives an SSH command
+   (`ssh -p <port> root@<address>`). Everything below happens on the server.
+2. **Bring the code and the data.** Clone this repository. Download the
+   dataset and the pretrained weights from Drive with `gdown`, as in sections 1
+   and 2. Downloading straight from Drive on the server is much faster than
+   uploading from a laptop. Check both sha256 sums and unpack the dataset.
+3. **Install.** Install PyTorch for the server's CUDA version, then
+   `requirements.txt`.
+4. **Check before paying for days.** Run `pytest`, then
+   `training/preflight.py`, which must end with `READY TO TRAIN`. Then run
+   `training/benchmark_memory.py` to see whether 1,800 frames fit in GPU memory
+   or the batch must be halved. This takes about 15 minutes and catches a
+   missing file or a too-small GPU before the expensive part.
+5. **Start the training in the background**, with `nohup` or inside `tmux`,
+   so that it keeps running when the SSH connection closes. Write the output to
+   `logs/`.
+6. **Watch it.** Follow the log and `exp/vsr_finetune/csv/` for `val/cer` at
+   the end of each epoch, as in section 2. The first epoch also tells you how
+   long the whole run will take (about 75 times as long). If the server or the
+   connection drops, restart with `--resume` from `last.ckpt`. Nothing is lost
+   but the current epoch.
+7. **Finish on the server.** When training ends, run `evaluate.py` and
+   `export_model.py`. This gives a `tr-vsr-model/` folder of about 1 GB with
+   the averaged model and its test results. Pack it and note its sha256.
+8. **Download, then destroy the server.** Copy the model to your machine with
+   `scp` and check the sha256. Then **Destroy** the instance in the vast.ai
+   console. Stop keeps the disk and keeps billing.
+
+The scripts in `training/vast/` do steps 2 to 7 in four commands:
+`setup.sh`, `check.sh`, `train.sh full` and `finish.sh`. They are resumable
+and verify every download. They come as one bundle built by `make_bundle.sh`,
+which also pins the Python and library versions.
+
+---
+
+## Repository layout
+
+```
+dataset-creation/   corpus.py (the dataset pipeline), YouTube download script, 50 sample clips
+training/           train.py, evaluate.py, export_model.py, transcribe.py, preflight.py, ...
+  configs/          base.yaml (every option), finetune/ (the recipes above), model/, data/, exp/
+  vast/             rented-GPU scripts and their guides
+dataset/            the downloaded archive and the unpacked dataset (not in git)
+avsr/               the library both parts use: model, data loading, mouth cropping, text, decoding
+reference/          original Auto-AVSR code (git submodules)
+docs/               method and results documents
+tests/              unit and end-to-end tests (python -m pytest)
+pretrained/ exp/    starting weights and training runs (not in git)
+```
 
 ## Further reading
 
-- `docs/dataset_construction.md`: how the dataset was transcribed, cut, cleaned and verified, for the methods section of a paper.
-- `docs/v3_degisiklik_raporu.md` (Turkish): what was wrong with the first corpus, how it was fixed, and the accounting of hours from recordings to dataset.
-- `docs/audit_and_roadmap_2026-10-17.md`: the audit that led to the rebuild, the decisions, and the log of the rebuild.
-- `docs/project_report.md`: what was built, from which sources, and what was measured (September 2026, first corpus).
-- `docs/deployment.md`: the remote server and the full fine-tuning, step by step.
-- `docs/findings.md`: what has been measured so far (first corpus).
-- `docs/roadmap.md`: notes on dataset cleaning and low-latency recognition.
-- `docs/literature.md`: the papers behind each option.
-- `docs/archive/`: the construction and label audit of the first corpus.
+| Document | Contents |
+|---|---|
+| [`DATASET.md`](DATASET.md) | the dataset files, checks run on them, statistics |
+| [`docs/dataset_construction.md`](docs/dataset_construction.md) | how the dataset was built, in method-section detail |
+| [`docs/ham_videolar.md`](docs/ham_videolar.md) | the 39 source recordings: links, sizes, checksums (Turkish) |
+| [`docs/codebase.md`](docs/codebase.md) | technical reference: pipeline stages, filtering rules, every model option, A/B experiments |
+| [`docs/findings.md`](docs/findings.md) | what has been measured so far |
+| [`docs/v3_degisiklik_raporu.md`](docs/v3_degisiklik_raporu.md) | what changed from the first corpus to v3 (Turkish) |
+| [`docs/literature.md`](docs/literature.md) | the papers behind each option |
+
+## Credits
+
+The model architecture, the pretrained weights and the Transformer/Conformer
+building blocks in `avsr/espnet/` (Apache 2.0) come from Auto-AVSR:
+P. Ma, A. Haliassos, A. Fernandez-Lopez, H. Chen, S. Petridis, M. Pantic,
+*Auto-AVSR: Audio-Visual Speech Recognition with Automatic Labels*,
+ICASSP 2023 ([github.com/mpc001/auto_avsr](https://github.com/mpc001/auto_avsr)).
+Transcripts were made with Whisper large-v3 through faster-whisper.

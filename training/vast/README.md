@@ -82,7 +82,7 @@ Sunucuda son durum:
 ```
 $WORK/                         /workspace (yoksa /root)
   tr-lipreading/              proje
-    avsr/ training/ training/configs/ tests/ docs/ deploy/
+    avsr/ dataset-creation/ training/ tests/ docs/
     assets/
     dataset/tr-lrs-v3/         39 oturum klasörü, 451.954 dosya
     dataset/tr-lrs-v3-manifests/  train.tsv val.tsv test.tsv
