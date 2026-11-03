@@ -1,6 +1,6 @@
 """Configuration loading.
 
-Layers, later ones winning: ``configs/base.yaml``, any number of override
+Layers, later ones winning: ``training/configs/base.yaml``, any number of override
 files, then ``key=value`` command-line overrides. Keys that do not exist in
 the base configuration are rejected, so a mistyped option fails loudly instead
 of being silently ignored.
@@ -11,7 +11,7 @@ import os
 from omegaconf import OmegaConf
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BASE_CONFIG = os.path.join(PROJECT_ROOT, "configs", "base.yaml")
+BASE_CONFIG = os.path.join(PROJECT_ROOT, "training", "configs", "base.yaml")
 
 
 def load_config(files=(), overrides=()):

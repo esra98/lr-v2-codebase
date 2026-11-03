@@ -10,7 +10,7 @@ The first corpus (September 2026) was built from 224x224 face clips whose
 transcripts had lost the distinction between dotted and dotless I; its
 construction is recorded in `docs/archive/dataset_construction_v2_2026-09-28.md`.
 Version 3 starts again from the recordings, so every step is in this
-repository and reproducible with `scripts/corpus.py`.
+repository and reproducible with `dataset-creation/corpus.py`.
 
 ## 1. Summary
 
@@ -46,7 +46,7 @@ with start time, end time and confidence.
 | Size | 180 GB |
 
 YouTube recordings were fetched with `yt-dlp` at the largest H.264 format up
-to 1080p (`scripts/corpus.py download`). Two recordings that were only
+to 1080p (`dataset-creation/corpus.py download`). Two recordings that were only
 available at 360p were replaced by their 1080p versions before cutting; no
 recording below 720p was cut. `videos/sources.tsv` lists every recording with
 its resolution, length, size and SHA-256 checksum.
@@ -406,7 +406,7 @@ new transcription the worst recording has 4.4 % recurrent transcripts.
 
 ## 9. Verification
 
-`scripts/corpus.py verify` checks the built dataset. Checks that decode
+`dataset-creation/corpus.py verify` checks the built dataset. Checks that decode
 clips were run on 300 random clips of each split, 900 in all; the others
 cover every clip. All passed on 2026-10-22.
 
@@ -458,12 +458,12 @@ cameras.
 ## 11. Reproduction
 
 ```bash
-python scripts/corpus.py ingest                      # videos/*.mp4 -> videos/sources.tsv
-python scripts/corpus.py download                    # YouTube sessions below 720p -> 1080p
-python scripts/corpus.py run --dataset dataset/tr-lrs-v3 --workers 7 --gpu-workers 4
-python scripts/corpus.py build --dataset dataset/tr-lrs-v3 --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
-python scripts/corpus.py verify --dataset dataset/tr-lrs-v3
-python scripts/train_tokenizer.py --manifest dataset/tr-lrs-v3-manifests/train.tsv --out-dir dataset/tr-lrs-v3-tokenizer
+python dataset-creation/corpus.py ingest                      # videos/*.mp4 -> videos/sources.tsv
+python dataset-creation/corpus.py download                    # YouTube sessions below 720p -> 1080p
+python dataset-creation/corpus.py run --dataset dataset/tr-lrs-v3 --workers 7 --gpu-workers 4
+python dataset-creation/corpus.py build --dataset dataset/tr-lrs-v3 --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
+python dataset-creation/corpus.py verify --dataset dataset/tr-lrs-v3
+python training/train_tokenizer.py --manifest dataset/tr-lrs-v3-manifests/train.tsv --out-dir dataset/tr-lrs-v3-tokenizer
 ```
 
 | File | Content |

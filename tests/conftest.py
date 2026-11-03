@@ -67,7 +67,7 @@ def toy_cfg(toy_data, tmp_path):
             "augment.audio.noise.enabled=false",
             "train.save_top_k=1",
         ]
-        files = [os.path.join(PROJECT_ROOT, "configs", "model", "tiny.yaml"), *files]
+        files = [os.path.join(PROJECT_ROOT, "training", "configs", "model", "tiny.yaml"), *files]
         return load_config(files, base + list(overrides))
 
     return make

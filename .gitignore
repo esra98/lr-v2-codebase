@@ -20,7 +20,7 @@ __pycache__/
 *.tar
 *.mp4
 # ... except the 50 sample clips
-!/samples/**/*.mp4
+!/dataset-creation/samples/**/*.mp4
 
 # Recordings, per-session pipeline state and the clips (docs/dataset_construction.md)
 /videos/

@@ -83,7 +83,7 @@ def load_pretrained(model, path, kind, scope="encoder"):
     if not loaded:
         raise ValueError(
             f"No weights from {path} fit the model. The checkpoint was probably trained "
-            "with a different model size (Auto-AVSR checkpoints need configs/model/base.yaml)."
+            "with a different model size (Auto-AVSR checkpoints need training/configs/model/base.yaml)."
         )
     model.load_state_dict(loaded, strict=False)
     # Remembered so that training can treat pretrained and new parameters differently.

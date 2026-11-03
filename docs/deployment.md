@@ -9,16 +9,16 @@ What was rehearsed locally and what was not is stated in section 10.
 `dataset/tr-lrs-v3` with `dataset/tr-lrs-v3-manifests/`,
 `dataset/tr-lrs-v3-tokenizer/`, `dataset/tr-lrs-v3.clips.tsv` and
 `dataset/tr-lrs-v3.settings.json` next to it (14 GB, 451,954 files, no
-`.aac` side files); `configs/base.yaml` already points there, so the
+`.aac` side files); `training/configs/base.yaml` already points there, so the
 `data.root` and `data.manifests` overrides below are only needed when the
 dataset is unpacked elsewhere. Read `data/` below as `dataset/`.
 
-**Note (2026-11-01).** For a fresh vast.ai server use `deploy/vast/`
-instead (`deploy/vast/README.md`, in Turkish): one small tar with the code
+**Note (2026-11-01).** For a fresh vast.ai server use `training/vast/`
+instead (`training/vast/README.md`, in Turkish): one small tar with the code
 and scripts that download the dataset, a wheelhouse (Python 3.12, PyTorch
 2.13 cu129) and the pretrained weights from Google Drive, check them, run
 the tests, train, and pack the finished model with
-`deploy/vast/MODEL_KULLANIMI.md`.
+`training/vast/MODEL_KULLANIMI.md`.
 
 ## 1. Overview
 
@@ -39,8 +39,8 @@ Everything lives in one project folder. The code comes from git; the data,
 the pretrained weights and two binary assets are not in git and are uploaded.
 
 ```
-~/lr-v2-codebase/                     project folder (git clone)
-  avsr/ scripts/ configs/ tests/ docs/     code, from git
+~/tr-lipreading/                     project folder (git clone)
+  avsr/ training/ training/configs/ tests/ docs/     code, from git
   requirements.txt
   assets/                             from tr-lrs-support.tar
     babble_noise.wav                    noise for audio augmentation
@@ -103,22 +103,22 @@ is uploaded the same way.
 ## 4. Code on the server
 
 ```bash
-git clone <repository URL> ~/lr-v2-codebase
-cd ~/lr-v2-codebase
+git clone <repository URL> ~/tr-lipreading
+cd ~/tr-lipreading
 ```
 
 ## 5. Data on the server
 
-Upload the content of `upload/` into `~/lr-v2-codebase/upload/`, either
+Upload the content of `upload/` into `~/tr-lipreading/upload/`, either
 directly
 
 ```bash
 # on the local machine
-rsync -av --progress upload/ <user>@<server>:~/lr-v2-codebase/upload/
+rsync -av --progress upload/ <user>@<server>:~/tr-lipreading/upload/
 ```
 
 or through a drive: upload the four files to the drive from the local
-machine and download them on the server into `~/lr-v2-codebase/upload/`
+machine and download them on the server into `~/tr-lipreading/upload/`
 (for example with `rclone copy`).
 
 Then, on the server, in the project folder:
@@ -174,7 +174,7 @@ reference code or the dataset-building packages are skipped.
 ## 7. Check the server
 
 ```bash
-python scripts/preflight.py -c configs/finetune/vsr_base.yaml
+python training/preflight.py -c training/configs/finetune/vsr_base.yaml
 ```
 
 It checks the software, the GPU, that every clip of the manifests is on
@@ -185,7 +185,7 @@ real data. It ends with `READY TO TRAIN` or a list of failed checks.
 Then find the largest batch that fits the GPU:
 
 ```bash
-python scripts/benchmark_memory.py -c configs/finetune/vsr_base.yaml \
+python training/benchmark_memory.py -c training/configs/finetune/vsr_base.yaml \
     --batch-frames 600 900 1200 1800 2400
 ```
 
@@ -208,7 +208,7 @@ Auto-AVSR used 1800 frames per batch. When fewer fit, keep
 ## 8. Fine-tune
 
 ```bash
-nohup python scripts/train.py -c configs/finetune/vsr_base.yaml \
+nohup python training/train.py -c training/configs/finetune/vsr_base.yaml \
     exp_name=vsr_finetune data.max_frames_per_batch=1800 data.num_workers=12 \
     > vsr_finetune.log 2>&1 &
 ```
@@ -250,7 +250,7 @@ time are spent:
 
 ```bash
 for scale in 0.02 0.1; do
-  python scripts/train.py -c configs/finetune/vsr_base.yaml \
+  python training/train.py -c training/configs/finetune/vsr_base.yaml \
       exp_name=pilot_scale_$scale train.pretrained_lr_scale=$scale \
       data.limit_train=20000 data.limit_val=1000 \
       train.max_epochs=4 train.warmup_epochs=0.5 train.hold_pretrained_epochs=0.25
@@ -276,7 +276,7 @@ would be 2.4 hours per epoch of the full training set (8.6 million frames).
 ### If the run stops
 
 ```bash
-python scripts/train.py -c configs/finetune/vsr_base.yaml <same options> \
+python training/train.py -c training/configs/finetune/vsr_base.yaml <same options> \
     --resume exp/vsr_finetune/checkpoints/last.ckpt
 ```
 
@@ -307,15 +307,15 @@ was skipped, and says which setting to lower.
 
 | To train | Command |
 |---|---|
-| Speech recognition from audio | `-c configs/finetune/asr_base.yaml` (needs `pretrained/asr_trlrs3vox2_base.pth`) |
-| Smaller models from scratch | `-c configs/model/small.yaml model.modality=video` |
+| Speech recognition from audio | `-c training/configs/finetune/asr_base.yaml` (needs `pretrained/asr_trlrs3vox2_base.pth`) |
+| Smaller models from scratch | `-c training/configs/model/small.yaml model.modality=video` |
 | Audio-visual, as in Auto-AVSR | `model.modality=audiovisual model.fusion.type=late_mlp` |
 | One model for all three inputs | `model.modality=audiovisual model.fusion.type=early_shared train.input_mode_probs=[0.4,0.2,0.4]` |
 
 ## 9. Evaluate
 
 ```bash
-python scripts/evaluate.py --run exp/vsr_finetune --average 10
+python training/evaluate.py --run exp/vsr_finetune --average 10
 ```
 
 This averages the 10 kept checkpoints, decodes the test set (6,094 clips of

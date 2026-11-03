@@ -62,7 +62,7 @@ Size on disk: 11 GB. No clip failed with an error.
 
 A clip is counted under the first check it fails.
 
-`scripts/verify_dataset.py` passes every check on the full dataset, with the
+`training/verify_dataset.py` passes every check on the full dataset, with the
 checks that decode video run on 900 clips: audio identical to the source in
 all of them, video within 2.0 of 255 of the crop rebuilt from raw (worst clip
 2.5), masks in training clips only.
@@ -138,7 +138,7 @@ the chain from raw clips to a trained model.
 | Step | Result |
 |---|---|
 | Build | 736 of 1200 clips kept; 17 s with cached landmarks |
-| Verification (`scripts/verify_dataset.py`) | all checks pass |
+| Verification (`training/verify_dataset.py`) | all checks pass |
 | Audio in the mp4 | sample-identical to the source in all 139 clips checked |
 | Transcript and aac files | byte-identical to the source |
 | Video against the crop rebuilt from raw | mean difference 2.0 of 255 (H.264 loss) |
@@ -229,7 +229,7 @@ Audio encoder of Auto-AVSR frozen, a small network trained on its output,
 | Audio, new layers 0.001, pretrained 0.00001 | 1,500 | 0.50 | 0.85 |
 | Audio, new layers 0.001, pretrained 0.00002, held for 500 updates | 1,500 | 0.46 | 0.86 |
 | Audio, the same with intermediate CTC at blocks 6 and 9 | 1,500 | 0.48 | 0.87 |
-| Video, training script with `configs/finetune/vsr_base.yaml` and `local_6gb.yaml` | 2,373 | 0.73 | 0.93 |
+| Video, training script with `training/configs/finetune/vsr_base.yaml` and `local_6gb.yaml` | 2,373 | 0.73 | 0.93 |
 
 The video run was stopped after its first epoch. The loss was still falling
 in every run of this table when it ended.

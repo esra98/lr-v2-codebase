@@ -108,9 +108,9 @@ was found in the literature.
 | `avsr/training/` | training and data modules, schedule, weight averaging | |
 | `avsr/` without `espnet/` | | 3,100 |
 | `avsr/espnet/` | building blocks copied from Auto-AVSR | 4,200 |
-| `scripts/` | command-line programs | 1,700 |
+| `training/` | command-line programs | 1,700 |
 | `tests/` | 241 tests | 2,200 |
-| `configs/` | `base.yaml` with every option; model sizes; experiments; fine-tuning | |
+| `training/configs/` | `base.yaml` with every option; model sizes; experiments; fine-tuning | |
 
 ### 3.2 Model
 
@@ -155,15 +155,15 @@ All are switches. The first is on by default, the others off.
 | More tokens than frames | the utterance is excluded |
 | Interrupted run | resumes from `last.ckpt`; earlier metrics are kept |
 | Invalid configuration | rejected before anything is loaded; unknown keys are errors |
-| Server differs from the development machine | `scripts/preflight.py` checks software, GPU, data and a trial run |
+| Server differs from the development machine | `training/preflight.py` checks software, GPU, data and a trial run |
 
 ### 3.5 A/B experiments
 
-`scripts/ab_test.py` runs the arms of an experiment file with several seeds,
+`training/ab_test.py` runs the arms of an experiment file with several seeds,
 each run in its own process, and compares every arm with the control paired
 by seed, with a 95 % confidence interval. Experiments are defined for
 intermediate CTC, input modality, padding mask, Partition-Time Masking, crop
-size and smoothing (`configs/exp/`). None has been run yet.
+size and smoothing (`training/configs/exp/`). None has been run yet.
 
 ## 4. The dataset
 
@@ -240,7 +240,7 @@ The layout is that of the source: one folder per session with `NNNNN.mp4`,
 
 ### 4.6 Verification
 
-`scripts/verify_dataset.py` passes all 21 checks: every clip of the
+`training/verify_dataset.py` passes all 21 checks: every clip of the
 manifests is on disk, transcripts and `.aac` files are byte-identical to the
 source, the audio in the mp4 is sample-identical, the video is within 2.0 of
 255 of the crop rebuilt from the raw clip, masks are in training clips only
@@ -349,8 +349,8 @@ leaves few examples per unit on under 100 hours of speech.
 | Code | cloned from the git repository |
 | Data | three files from `upload/`: dataset (11 GB), support files (56 MB), pretrained weights (1 GB), with checksums |
 | Software | Python 3.10 or newer, a PyTorch build that fits the driver, `requirements.txt` |
-| Before training | `scripts/preflight.py`, then `scripts/benchmark_memory.py` to choose the batch size |
-| Training | `configs/finetune/vsr_base.yaml`, 75 epochs, 1800 frames per update |
+| Before training | `training/preflight.py`, then `training/benchmark_memory.py` to choose the batch size |
+| Training | `training/configs/finetune/vsr_base.yaml`, 75 epochs, 1800 frames per update |
 | Evaluation | average of the 10 kept checkpoints, beam search, test set of two unseen sessions |
 
 Not in git and not uploaded: the raw corpus copy, the landmark cache, the

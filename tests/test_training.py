@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import torch
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "training"))
 
 import train as train_script  # noqa: E402
 

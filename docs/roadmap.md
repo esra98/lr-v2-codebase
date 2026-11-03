@@ -31,7 +31,7 @@ crop change in `cut` reuses the landmarks.
 
 ### Implemented
 
-The rules are applied by `scripts/corpus.py segment` (text) and `cut`
+The rules are applied by `dataset-creation/corpus.py segment` (text) and `cut`
 (video); `build` records the verdict of every utterance in the clip table
 next to the dataset, and `docs/dataset_construction.md` has the counts.
 

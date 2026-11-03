@@ -15,10 +15,9 @@ from avsr.config import PROJECT_ROOT, load_config
 from avsr.models.e2e import AVSRModel
 from avsr.models.pretrained import load_pretrained
 
-# The original Auto-AVSR code is kept outside the repository.
-REFERENCE = os.environ.get(
-    "AUTO_AVSR_REFERENCE", os.path.expanduser("~/Desktop/archive/auto-avsr-reference-codebase/auto_avsr")
-)
+# The original Auto-AVSR code: the reference/auto_avsr submodule
+# (git submodule update --init), or AUTO_AVSR_REFERENCE.
+REFERENCE = os.environ.get("AUTO_AVSR_REFERENCE", os.path.join(PROJECT_ROOT, "reference", "auto_avsr"))
 CHECKPOINTS = {
     "video": os.path.join(PROJECT_ROOT, "pretrained", "vsr_trlrs2lrs3vox2avsp_base.pth"),
     "audio": os.path.join(PROJECT_ROOT, "pretrained", "asr_trlrs3vox2_base.pth"),
@@ -52,7 +51,7 @@ def test_outputs_match_the_reference_implementation(reference_e2e, kind):
     reference.load_state_dict(checkpoint)
     reference.eval()
 
-    cfg = load_config(["configs/model/base.yaml"], [f"model.modality={kind}"])
+    cfg = load_config(["training/configs/model/base.yaml"], [f"model.modality={kind}"])
     model = AVSRModel(VOCAB, cfg.model)
     loaded, skipped = load_pretrained(model, path, kind, "full")
     assert not skipped

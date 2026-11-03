@@ -21,7 +21,7 @@ buradaki her sayı oralardaki ölçümlerden alınmıştır.
 | Test seti | `2025-2026-birlesim-3` + `video-10`; birincisinin transkripti başka güne aitti | `2025-2026-birlesim-3` + `yt-NPJohShU_iw`, ikisi de doğru transkriptle |
 | Konuşmacı | tek yüz; yakın planda dinleyici kesilebiliyordu | 4 yüze kadar takip, dudak hareketine göre seçim |
 | PTM maskesi | kliplere yazılmış (her epoch aynı maske) | eğitimde uygulanıyor (her epoch yeni maske) |
-| Yeniden üretim | tar dosyalarından, ilk aşama kod dışında | `scripts/corpus.py` ile baştan sona, kesintiden devam edebilir |
+| Yeniden üretim | tar dosyalarından, ilk aşama kod dışında | `dataset-creation/corpus.py` ile baştan sona, kesintiden devam edebilir |
 
 ## 2. Eski veri setinde neler bozuktu
 
@@ -75,7 +75,7 @@ buradaki her sayı oralardaki ölçümlerden alınmıştır.
   kayıtları `yt-<video id>.mp4`. `videos/sources.tsv` her kaydın kaynağını,
   çözünürlüğünü, süresini, boyutunu ve SHA-256'sını tutar.
 - 20 YouTube oturumu 1080p H.264 olarak yeniden indirildi
-  (`scripts/corpus.py download`; `yt-dlp` 2026.08+ ve `--js-runtimes node`
+  (`dataset-creation/corpus.py download`; `yt-dlp` 2026.08+ ve `--js-runtimes node`
   gerekir, yoksa HTTP 403). Dosyalar 4–6 GB; indirme 15 GB boş alanın
   altında duraklar ve 360p dosyayı yalnız doğrulamadan sonra değiştirir.
 - Kopyalar, eski deneyler (`exp/`), pip önbelleği, çöp kutusu ve `data/raw`
@@ -84,7 +84,7 @@ buradaki her sayı oralardaki ölçümlerden alınmıştır.
 
 ### Faz 1: yeniden başlatılabilir boru hattı (`avsr/corpus/`)
 
-Tek giriş noktası `scripts/corpus.py`; her aşama oturum başına
+Tek giriş noktası `dataset-creation/corpus.py`; her aşama oturum başına
 `work/<oturum>/status.json`'a girdi ve seçeneklerin özetini (hash) yazar,
 yalnız bunlar değişince yeniden çalışır.
 
@@ -186,11 +186,11 @@ gerektirmez.
 
 ### Faz 5: depo temizliği
 
-- Silindi (git geçmişinde duruyor): `scripts/{extract_raw, build_dataset,
+- Silindi (git geçmişinde duruyor): `training/{extract_raw, build_dataset,
   audit_labels, verify_dataset, build_manifest}.py`, `tests/test_scripts.py`,
   `avsr/preprocess/{pipeline, ptm_bake}.py`, `manifest.py`'deki ham derlem
   yardımcıları.
-- `configs/base.yaml` ve ince ayar config'leri `dataset/tr-lrs-v3`'ü
+- `training/configs/base.yaml` ve ince ayar config'leri `dataset/tr-lrs-v3`'ü
   gösterir; PTM eğitimde açık. A/B deney dosyaları (`roi`, `smoothing`,
   `ptm`) yeni `cut` komutlarına göre yazıldı.
 - Depo dışına taşındı (`~/Desktop/archive/`): Auto-AVSR referans kodu
@@ -262,7 +262,7 @@ dataset/tr-lrs-v3.settings.json       aşama seçenekleri ve bölünme
 ```
 
 50 örnek klip (36 eğitim, 7 doğrulama, 7 test; 38 oturumdan) depoda
-`samples/` altında, `samples/clips.tsv` ile birlikte.
+`dataset-creation/samples/` altında, `dataset-creation/samples/clips.tsv` ile birlikte.
 
 ## 6. Bilinen sınırlar ve sıradaki işler
 
@@ -277,5 +277,5 @@ dataset/tr-lrs-v3.settings.json       aşama seçenekleri ve bölünme
   kurtarılamaz.
 - v2'ye ait ince ayarlı kontrol noktaları eski alfabeyle eğitildi; v3 test
   setinde çıkış katmanları yeniden eğitilmeden değerlendirilemez.
-- Sıradaki adım: v3 üzerinde eğitim (`configs/finetune/vsr_base.yaml`,
+- Sıradaki adım: v3 üzerinde eğitim (`training/configs/finetune/vsr_base.yaml`,
   uzak GPU; `docs/deployment.md`).

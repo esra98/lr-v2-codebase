@@ -1,0 +1,13 @@
+# Does Partition-Time Masking help on top of ordinary time masking?
+name: ptm
+description: >
+  No PTM versus PTM drawn anew in every epoch. Validation clips are never
+  masked.
+control: no_ptm
+seeds: [1, 2, 3]
+metrics: [val/cer, val/wer, val/loss]
+files: [training/configs/exp/_local_video.yaml]
+overrides: []
+arms:
+  no_ptm: [augment.video.ptm.enabled=false]
+  ptm_each_epoch: [augment.video.ptm.enabled=true]

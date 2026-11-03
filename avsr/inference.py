@@ -47,7 +47,7 @@ def load_trained(run_dir, average=1, overrides=()):
     """Build the module of a finished run with its trained weights.
 
     ``run_dir`` is a training run or a model folder made by
-    ``scripts/export_model.py``, which carries its own ``tokenizer.model``.
+    ``training/export_model.py``, which carries its own ``tokenizer.model``.
 
     Returns (module, checkpoint paths, whether the moving average was used).
     """

@@ -1,7 +1,7 @@
 # The dataset this code trains on: TR-LRS v3
 
-Naming note: this repository is the *second codebase* of the project
-(`lr-v2-codebase`), but the dataset it uses is the *third* corpus,
+Naming note: this repository (`tr-lipreading`, formerly `lr-v2-codebase`,
+the *second codebase* of the project) uses the *third* corpus,
 **TR-LRS v3** (`dataset/tr-lrs-v3`, built 2026-10-22). The first corpus
 (`tr-lrs-clean-ptm`, September 2026, "v2 dataset") is obsolete: its
 transcripts had merged the dotted and dotless I, half of its video was
@@ -13,8 +13,9 @@ Its construction is kept in `docs/archive/` for the record only.
 | Copy | Location |
 |---|---|
 | Working copy | `dataset/tr-lrs-v3/` on the build machine (14 GB, 451,954 files) |
-| Archive | `tr-lrs-v3.tar.gz` (12.9 GB) in the Google Drive folder `16tybAQsivB4GPGB2piDDpuoSJeWToBCS`, with `tr-lrs-v3.tar.gz.sha256` beside it |
-| Format sample | `samples/` in this repository: 50 clips with labels and their clip-table rows |
+| Local archive | `dataset/tr-lrs-v3.tar.gz` (12.9 GB) in this folder, with its `.sha256` (not in git) |
+| Drive archive | `tr-lrs-v3.tar.gz` (12.9 GB) in the Google Drive folder `16tybAQsivB4GPGB2piDDpuoSJeWToBCS`, with `tr-lrs-v3.tar.gz.sha256` beside it |
+| Format sample | `dataset-creation/samples/` in this repository: 50 clips with labels and their clip-table rows |
 
 ```
 sha256  143122937a84a16748a8b22b415d3d49b993c522f44a2b8842eb46d1dda55b8e  tr-lrs-v3.tar.gz
@@ -31,19 +32,19 @@ dataset/tr-lrs-v3.settings.json                 stage options and split
 ```
 
 ```bash
-sha256sum -c tr-lrs-v3.tar.gz.sha256
-tar -xzf tr-lrs-v3.tar.gz -C <project folder>      # creates <project folder>/dataset/
+(cd dataset && sha256sum -c tr-lrs-v3.tar.gz.sha256)
+tar -xzf dataset/tr-lrs-v3.tar.gz -C .      # from the project root; creates dataset/tr-lrs-v3/ etc.
 ```
 
 ## Compatibility with this codebase
 
-`configs/base.yaml` and the fine-tuning configs already point at
+`training/configs/base.yaml` and the fine-tuning configs already point at
 `dataset/tr-lrs-v3`, its manifests and `unigram1000.model`; no override is
 needed when the archive is unpacked inside the project folder. Partition-Time
 Masking is applied during training (`augment.video.ptm.enabled: true`), not
 written into the clips.
 
-Checked on 2026-10-22 with `scripts/preflight.py -c configs/finetune/vsr_base.yaml -c configs/finetune/local_6gb.yaml`
+Checked on 2026-10-22 with `training/preflight.py -c training/configs/finetune/vsr_base.yaml -c training/configs/finetune/local_6gb.yaml`
 on the build machine (RTX 2060):
 
 | Check | Result |
@@ -56,7 +57,7 @@ on the build machine (RTX 2060):
 | Trial training run, base model | 20 steps, no batch out of memory |
 | `python -m pytest` | 254 passed |
 
-On a large GPU use `configs/finetune/vsr_base.yaml` alone
+On a large GPU use `training/configs/finetune/vsr_base.yaml` alone
 (`data.max_frames_per_batch: 1800`); the `local_6gb.yaml` overlay is only
 for trying the run on a 6 GB card. See `docs/deployment.md` for the server
 steps and `docs/dataset_construction.md` for how the dataset was built.

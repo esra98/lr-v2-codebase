@@ -19,15 +19,29 @@ three tasks.
 
 ## Layout
 
+The project has three parts: the code that builds the dataset, the code that
+trains on it, and the dataset itself. Both code parts use the shared `avsr/`
+library. Run every command from this folder (the project root).
+
 ```
-videos/                        full-length recordings, one per session, and sources.tsv
-work/<session>/                per-session pipeline state: transcript.json, segments.tsv,
-                               clips.tsv, landmarks/, status.json (all resumable)
-dataset/<name>/<session>/      the clips: <utt>.mp4 (96x96 mouth + 16 kHz audio), <utt>.txt
-dataset/<name>.clips.tsv       every utterance with its verdict and split
-dataset/<name>-manifests/      train / val / test manifests
-avsr/
-  corpus/       ingest, transcribe, segment, cut, build: recordings -> dataset
+dataset-creation/              recordings -> dataset
+  corpus.py                    pipeline: ingest, download, transcribe, segment, cut, build, verify
+  download_youtube_1080p.sh    re-download the YouTube sessions at 1080p
+  samples/                     50 clips of the dataset with their labels, to see the format
+training/                      dataset -> model
+  train.py evaluate.py         training and evaluation
+  transcribe.py export_model.py  inference on any video, model packaging
+  preflight.py benchmark_memory.py ab_test.py train_tokenizer.py
+  configs/                     base.yaml (every option), data/, model/ (tiny, small, base), exp/ (A/B), finetune/
+  vast/                        rented-GPU (vast.ai) setup, training and packaging scripts
+dataset/
+  tr-lrs-v3.tar.gz (+.sha256)  the dataset; unpacking it here creates the folders below
+  tr-lrs-v3/<session>/         the clips: <utt>.mp4 (96x96 mouth + 16 kHz audio), <utt>.txt
+  tr-lrs-v3.clips.tsv          every utterance with its verdict and split
+  tr-lrs-v3-manifests/         train / val / test manifests
+  tr-lrs-v3-tokenizer/         SentencePiece models
+avsr/                          shared library
+  corpus/       ingest, transcribe, segment, cut, build (used by dataset-creation)
   text/         Turkish normalisation, label parsing, tokenizers
   preprocess/   landmarks, trajectory smoothing, mouth cropping, audio/video I/O
   data/         label rules, clip table, manifests, augmentation, batching
@@ -35,15 +49,19 @@ avsr/
   decoding/     joint CTC/attention beam search
   training/     Lightning modules, schedule, weight averaging
   espnet/       Transformer/Conformer building blocks from Auto-AVSR (Apache 2.0)
-configs/
-  base.yaml     every option, with defaults
-  data/         dataset presets
-  model/        size presets: tiny, small, base
-  exp/          A/B experiment definitions
-scripts/        command-line entry points (see below)
-tests/          unit and end-to-end tests
-docs/           how the corpus was built, literature notes, findings
-samples/        50 clips of the dataset with their labels, to see the format
+docs/          how the corpus was built (dataset_construction.md, ham_videolar.md),
+               literature notes, findings, project report
+tests/         unit and end-to-end tests
+reference/      original Auto-AVSR and VSR-for-multiple-languages code (git submodules, pinned)
+pretrained/    Auto-AVSR starting weights;  exp/  training runs;  logs/
+videos/, work/ only while building the dataset: raw recordings and per-session state
+```
+
+Unpack the dataset before training:
+
+```bash
+(cd dataset && sha256sum -c tr-lrs-v3.tar.gz.sha256)
+tar -xzf dataset/tr-lrs-v3.tar.gz -C .
 ```
 
 `videos/`, `work/`, `dataset/`, `exp/` and `pretrained/` are not in git.
@@ -77,24 +95,24 @@ or a YouTube upload (`yt-<id>.mp4`). Everything is driven by one script:
 
 ```bash
 # 1. Register the recordings: resolution, length, checksum -> videos/sources.tsv
-python scripts/corpus.py ingest
+python dataset-creation/corpus.py ingest
 
 # 2. Fetch YouTube sessions at up to 1080p (resumable, replaces smaller files)
-python scripts/corpus.py download --ids fP99G1PONhQ ...
+python dataset-creation/corpus.py download --ids fP99G1PONhQ ...
 
 # 3. Transcribe, segment and cut, session by session (NVIDIA GPU for Whisper; the
 #    face detector runs on the Intel GPU for --gpu-workers of the --workers, CPU for the rest)
-python scripts/corpus.py run --dataset dataset/tr-lrs-v3 --workers 7 --gpu-workers 4
+python dataset-creation/corpus.py run --dataset dataset/tr-lrs-v3 --workers 7 --gpu-workers 4
 
 # 4. Clip table, split and manifests; then check the result
-python scripts/corpus.py build --dataset dataset/tr-lrs-v3 --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
-python scripts/corpus.py verify --dataset dataset/tr-lrs-v3
+python dataset-creation/corpus.py build --dataset dataset/tr-lrs-v3 --holdout 2025-2026-birlesim-3 yt-NPJohShU_iw
+python dataset-creation/corpus.py verify --dataset dataset/tr-lrs-v3
 
 # 5. Tokenizer, batch size, training, evaluation
-python scripts/train_tokenizer.py --manifest dataset/tr-lrs-v3-manifests/train.tsv --out-dir dataset/tr-lrs-v3-tokenizer
-python scripts/benchmark_memory.py -c configs/model/small.yaml model.modality=video
-python scripts/train.py -c configs/model/small.yaml model.modality=video exp_name=vsr_small
-python scripts/evaluate.py --run exp/vsr_small --average 10
+python training/train_tokenizer.py --manifest dataset/tr-lrs-v3-manifests/train.tsv --out-dir dataset/tr-lrs-v3-tokenizer
+python training/benchmark_memory.py -c training/configs/model/small.yaml model.modality=video
+python training/train.py -c training/configs/model/small.yaml model.modality=video exp_name=vsr_small
+python training/evaluate.py --run exp/vsr_small --average 10
 ```
 
 `run` is `transcribe`, `segment` and `cut`, which can also be called one at a
@@ -126,7 +144,7 @@ The training target is the normalised text of the clip table: upper case
 with Turkish casing (`i` -> `İ`, `ı` -> `I`, 29 letters plus Q, W, X),
 digits spelled out, punctuation removed. Partition-Time Masking is applied
 during training (`augment.video.ptm`), not written into the clips.
-`configs/base.yaml` points at this dataset and its tokenizer.
+`training/configs/base.yaml` points at this dataset and its tokenizer.
 
 ### Mouth crop
 
@@ -187,17 +205,18 @@ of them shots without a visible face.
 
 With the base preset and `model.mask_conv_padding=false` the model computes
 exactly what the original Auto-AVSR code computes from the same weights
-(`tests/test_reference_equivalence.py`; it needs the original code, whose
-location is read from `AUTO_AVSR_REFERENCE`, and skips when it is absent).
+(`tests/test_reference_equivalence.py`; it needs the original code in the
+`reference/auto_avsr` submodule, `git submodule update --init`, or at
+`AUTO_AVSR_REFERENCE`, and skips when it is absent).
 
 ## A/B experiments
 
 An experiment file lists arms (sets of overrides), a control arm and seeds:
 
 ```bash
-python scripts/ab_test.py configs/exp/ptm.yaml --dry-run   # validate only
-python scripts/ab_test.py configs/exp/ptm.yaml             # run and report
-python scripts/ab_test.py configs/exp/ptm.yaml --report-only
+python training/ab_test.py training/configs/exp/ptm.yaml --dry-run   # validate only
+python training/ab_test.py training/configs/exp/ptm.yaml             # run and report
+python training/ab_test.py training/configs/exp/ptm.yaml --report-only
 ```
 
 Each run is its own process. Runs that already finished are skipped, so an
@@ -221,7 +240,7 @@ for the difference; a verdict is only stated when that interval excludes zero.
 ## Fine-tuning from the Auto-AVSR weights
 
 ```bash
-python scripts/train.py -c configs/finetune/vsr_base.yaml exp_name=vsr_finetune
+python training/train.py -c training/configs/finetune/vsr_base.yaml exp_name=vsr_finetune
 ```
 
 Pretrained parts are trained with a much lower learning rate than the new
@@ -238,7 +257,7 @@ support files into the project folder and the weights into `pretrained/`,
 install `requirements.txt`, and run
 
 ```bash
-python scripts/preflight.py -c configs/finetune/vsr_base.yaml
+python training/preflight.py -c training/configs/finetune/vsr_base.yaml
 ```
 
 which checks the server and ends with `READY TO TRAIN` or a list of what is

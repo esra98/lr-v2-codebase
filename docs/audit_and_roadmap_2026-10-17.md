@@ -97,7 +97,7 @@ Dead weight in and around the repo:
 | `exp/` local rehearsal runs | 13 GB | delete after keeping any checkpoint you want |
 | `data/sample*`, `data/sample-manifests`, `data/sample-tokenizer` | 52 MB | delete |
 | `logs/` | 420 KB | delete |
-| `scripts/extract_raw.py` | | delete once clips are cut from full videos |
+| `training/extract_raw.py` | | delete once clips are cut from full videos |
 | `prompt.text`, `.pytest_cache` | | delete |
 | `reference-codebase/`, `papers/` | 236 MB | move out of the repo (already git-ignored) |
 | `docs/deployment.md`, `docs/project_report.md` | | keep, mark as describing the v2 dataset |
@@ -167,10 +167,10 @@ lr-v2-codebase/
       cut.py                        sequential decode of a session, landmarks, face-224 and/or mouth-96 writer
       status.py                     stage markers, atomic writes, resume
     text/ data/ preprocess/ models/ decoding/ training/ espnet/ utils/   as now
-  scripts/
+  training/
     corpus.py                       one CLI: ingest | transcribe | segment | cut | build | verify  [--sessions]
     train.py evaluate.py ab_test.py preflight.py train_tokenizer.py benchmark_memory.py  as now
-  configs/  tests/  docs/
+  training/configs/  tests/  docs/
 ```
 
 Rules of the structure:
@@ -322,7 +322,7 @@ Done:
   transcripts; `video-34` is under `work/unidentified-video-34/`.
 - Repo tagged `v2-dataset-2026-09-28`; `videos/`, `work/`, `dataset/`
   git-ignored.
-- `scripts/download_youtube_1080p.sh` re-downloads the 20 YouTube sessions
+- `dataset-creation/download_youtube_1080p.sh` re-downloads the 20 YouTube sessions
   (H.264 1080p, resumable, replaces the 360p file once verified, pauses
   under 15 GB free). It needs `.venv/bin/yt-dlp` 2026.08+ with
   `--js-runtimes node`; older builds and builds without a JavaScript runtime
@@ -336,7 +336,7 @@ Done:
 
 ## 8. Phase 1 and 2 log (2026-10-17)
 
-Code, all under `avsr/corpus/` with `scripts/corpus.py` as the single entry
+Code, all under `avsr/corpus/` with `dataset-creation/corpus.py` as the single entry
 point and `tests/test_corpus.py` (19 tests):
 
 | Module | Does |
@@ -347,7 +347,7 @@ point and `tests/test_corpus.py` (19 tests):
 | `segment.py` | transcript → `segments.tsv`: sentence end, pause > 0.4 s, 10 s cap split at the longest pause, 2-word minimum; true-case text and word times (`words` column); text verdicts (R1–R6 of the old pipeline plus `no_speech` when Whisper's `no_speech_prob` > 0.6) |
 | `cut.py` | one sequential decode per session; frames picked nearest to the 25 fps grid; up to 4 faces per frame tracked through the clip and the **speaker chosen by lip motion** (with a size floor); frames shrunk so the face is ≤160 px; mouth 96x96 (or face) + 16 kHz mono AAC in one mp4, LRS2-style `.txt`; `work/<session>/clips.tsv` appended per clip for resume; landmarks cached; pauses under 5 GB free |
 | `build.py` | clip table in the old `CLIP_FIELDS` layout, whole-session test split, last-5 % validation block, manifests; `verify` with 11 checks |
-| `scripts/corpus.py run` | transcribes one session at a time on the GPU and cuts finished sessions in 4 worker processes meanwhile |
+| `dataset-creation/corpus.py run` | transcribes one session at a time on the GPU and cuts finished sessions in 4 worker processes meanwhile |
 
 Findings while testing on real data:
 
@@ -381,10 +381,10 @@ Findings while testing on real data:
   per epoch, which removes the fixed-mask limitation of the v2 dataset.
 - **No separate `.aac` file**: the mp4 carries the 16 kHz mono audio.
 
-Pipeline started 2026-10-17 with `scripts/corpus.py run --dataset dataset/tr-lrs-v3`
+Pipeline started 2026-10-17 with `dataset-creation/corpus.py run --dataset dataset/tr-lrs-v3`
 (`logs/run_v3.log`); the 1080p re-download continues alongside
 (`logs/download_1080p.log`); sessions still at 360p are transcribed but
-cut only after their 1080p file has arrived (`scripts/corpus.py cut` again).
+cut only after their 1080p file has arrived (`dataset-creation/corpus.py cut` again).
 
 ### Finding on the first cut session (2026-10-17, afternoon)
 
@@ -434,7 +434,7 @@ the whole 1080p frame at a further seventh. Changes, all in
   choice and is left out of the options hash, so a change of it does not
   discard partial results.
 - Four processes saturate the integrated GPU (six gave no more than four),
-  so `scripts/corpus.py run --workers 7 --gpu-workers 4` runs four workers
+  so `dataset-creation/corpus.py run --workers 7 --gpu-workers 4` runs four workers
   on the GPU delegate and three on the CPU: 79 utterances per minute in
   total with the transcriber alongside, against 56 before the evening.
 - Resume now seeks to the first utterance left (`FrameSource.seek`)
@@ -458,7 +458,7 @@ uses half the crop plus 10%, and when the chosen face still lies outside,
 the utterance's frames are read again (a seek, cheap) with the square
 centred on the chosen face. On 16 real error utterances of
 `2024-2025-birlesim-109`, 14 became `kept`; the two left have the mouth too
-close to the frame edge for a full crop. `scripts/corpus.py cut
+close to the frame edge for a full crop. `dataset-creation/corpus.py cut
 --retry-errors` cuts only the error rows again; their new rows replace the
 old ones in `clips.tsv` (the last row of an utterance counts).
 
@@ -482,11 +482,11 @@ Phase 3: `build` with holdout `2025-2026-birlesim-3` and `yt-NPJohShU_iw`,
 The full numbers are in `docs/dataset_construction.md`, which was rewritten
 for v3; the v2 document and label audit moved to `docs/archive/`.
 
-Phase 5: removed `scripts/{extract_raw,build_dataset,audit_labels,
+Phase 5: removed `training/{extract_raw,build_dataset,audit_labels,
 verify_dataset,build_manifest}.py`, `tests/test_scripts.py`,
 `avsr/preprocess/{pipeline,ptm_bake}.py` and the raw-corpus helpers of
 `avsr/data/manifest.py` (all in git history, tag `v2-dataset-2026-09-28`).
-`configs/base.yaml` and the fine-tuning configs point at
+`training/configs/base.yaml` and the fine-tuning configs point at
 `dataset/tr-lrs-v3`; the A/B files for ROI and smoothing name the `cut`
 commands that make their variant datasets. Moved out of the repository into
 `~/Desktop/archive/`: the Auto-AVSR reference code
