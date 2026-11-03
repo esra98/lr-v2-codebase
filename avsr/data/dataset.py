@@ -167,9 +167,16 @@ class BucketBatchSampler(torch.utils.data.Sampler):
     epoch to epoch, and a trainer that plans its validation from a stale
     count skips it. Create a new sampler, or call ``set_epoch``, for every
     epoch.
+
+    ``skip`` leaves out the first batches of the epoch: those already trained
+    on before a run that stopped in the middle of the epoch was resumed.
+    ``len()`` still counts them, because the trainer continues its batch
+    count where it stopped and ends the epoch at ``len()``.
     """
 
-    def __init__(self, lengths, max_frames, max_batch_size=None, num_buckets=50, shuffle=True, seed=0, epoch=0):
+    def __init__(
+        self, lengths, max_frames, max_batch_size=None, num_buckets=50, shuffle=True, seed=0, epoch=0, skip=0
+    ):
         self.lengths = list(lengths)
         if not self.lengths:
             raise ValueError("lengths is empty")
@@ -183,6 +190,7 @@ class BucketBatchSampler(torch.utils.data.Sampler):
         self.num_buckets = max(1, num_buckets)
         self.shuffle = shuffle
         self.seed = seed
+        self.skip = skip
         self.set_epoch(epoch)
 
     def _make_batches(self, rng):
@@ -214,7 +222,7 @@ class BucketBatchSampler(torch.utils.data.Sampler):
         self._batches = self._make_batches(random.Random(self.seed * 100003 + epoch))
 
     def __iter__(self):
-        return iter(self._batches)
+        return iter(self._batches[self.skip :])
 
     def __len__(self):
         return len(self._batches)

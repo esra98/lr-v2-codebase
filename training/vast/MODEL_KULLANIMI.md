@@ -1,35 +1,44 @@
-# Türkçe dudak okuma modeli: kullanım
+# Türkçe dudak okuma ve görüntü+ses modeli: kullanım
 
-Bu klasördeki model, sessiz bir konuşma videosundan konuşanın dudak
-hareketlerini okuyup Türkçe metin çıkarır (görsel konuşma tanıma, VSR). Ses
-kullanılmaz.
+Bu rehber iki model paketi için de geçerlidir; hangisi olduğu
+`model_info.json`'daki `modality` alanında yazar:
+
+- **`tr-vsr-model`** (`video`): sessiz bir konuşma videosundan konuşanın
+  dudak hareketlerini okuyup Türkçe metin çıkarır (görsel konuşma tanıma,
+  VSR). Ses kullanılmaz.
+- **`tr-avsr-model`** (`audiovisual`): dudak hareketleriyle birlikte
+  videonun sesini de kullanır (görüntü+ses tanıma, AVSR). Gürültülü seste
+  dudaklar yardımcı olur. Videoda ses akışı olmalıdır.
 
 | | |
 |---|---|
-| Model | Auto-AVSR mimarisi: 3D konvolüsyon + ResNet-18 ön uç, 12 Conformer bloğu, 6 Transformer decoder bloğu, 241M parametre |
-| Başlangıç | Ma ve ark. `vsr_trlrs2lrs3vox2avsp_base` (3.291 saat İngilizce) |
-| Fine-tune | TR-LRS v3: TBMM Genel Kurulu konuşmaları (TBMM TV / Meclis TV yayınları), 207,8 saat, 208.811 klip |
+| Model | Auto-AVSR mimarisi: 3D konvolüsyon + ResNet-18 ön uç, 12 Conformer bloğu, 6 Transformer decoder bloğu, 241M parametre. Görüntü+ses: ek olarak 1D ResNet-18 ses ön ucu ve 12 Conformer bloğu, iki kolu birleştiren MLP; 435M parametre |
+| Başlangıç | Ma ve ark. `vsr_trlrs2lrs3vox2avsp_base` (3.291 saat İngilizce); görüntü+ses modelinin ses kolu `asr_trlrs3vox2_base` (1.759 saat) |
+| Fine-tune | TR-LRS v3: TBMM Genel Kurulu konuşmaları (TBMM TV / Meclis TV yayınları), 207,8 saat, 208.811 klip; görüntü+ses modelinde sese babble gürültüsü karıştırılarak |
 | Çıktı | Büyük harfli Türkçe, noktalama yok, sayılar yazıyla (`1921` → `BİN DOKUZ YÜZ YİRMİ BİR`), İ/I ayrımı korunur |
-| Doğruluk | `eval/test_video.json`: eğitimde hiç görülmemiş iki oturumda (6.173 klip) kelime (WER) ve karakter (CER) hata oranı |
+| Doğruluk | `eval/test_<girdi>.json` (`test_video`, `test_audiovisual`, gürültülü testler `test_audiovisual_snr0` vb.): eğitimde hiç görülmemiş iki oturumda (6.173 klip) kelime (WER) ve karakter (CER) hata oranı |
 
 ## 1. Klasörde ne var
 
 ```
-tr-vsr-model/
+tr-vsr-model/  (ya da tr-avsr-model/)
   checkpoints/epoch-avg.ckpt   ağırlıklar (son 10 epoch'un ortalaması)
   config.yaml                  model ve eğitim ayarları
   tokenizer.model              1.000 birimlik Türkçe SentencePiece
-  eval/test_video.json         test sonuçları (WER, CER)
-  eval/test_video.tsv          her test klibi: referans ve modelin çıktısı
+  eval/test_*.json             test sonuçları (WER, CER), girdi moduna göre
+  eval/test_*.tsv              her test klibi: referans ve modelin çıktısı
   csv/metrics*.csv             epoch başına val/cer, val/wer, loss (devam ettirilen eğitimde parça parça)
   logs/                        eğitim ve test logları
-  model_info.json              ortalanan checkpoint'ler
+  model_info.json              ortalanan checkpoint'ler, modelin modu
   code.tar                     modeli çalıştıran kod (tr-lipreading)
   assets/face_landmarker.task  yüz noktaları modeli (MediaPipe)
   MODEL_KULLANIMI.md           bu dosya
 ```
 
 ## 2. Kurulum (bir kez)
+
+Aşağıdaki komutlarda `tr-vsr-model` geçen yerlere, görüntü+ses modelinde
+`tr-avsr-model` yazın.
 
 Laptoptaki `~/Desktop/tr-lipreading` aynı kodu içeriyorsa (`git log`'da
 `code.tar`'ın commit'i varsa) o kullanılabilir; 2b'ye geçin.
@@ -57,6 +66,8 @@ source .venv/bin/activate
 python training/transcribe.py --run /tam/yol/tr-vsr-model konusma.mp4
 ```
 
+Görüntü+ses modeli videonun sesini kendisi okur (`--run /tam/yol/tr-avsr-model`).
+
 Çıktı (sekmeyle ayrılmış):
 
 ```
@@ -80,6 +91,7 @@ Seçenekler:
 | `--save-crop agiz.mp4` | Modelin gördüğü 96x96 ağız kırpıntısını kaydeder: yanlış kişi ya da kayık kırpma olup olmadığını görmek için |
 | `--beam-size 10` | Daha hızlı, biraz daha az doğru (varsayılan 40) |
 | `--cpu` | GPU olsa da CPU'da çalıştırır |
+| `--mode video` | Görüntü+ses modelinde sesi kullanmaz (ses kolu sıfırla beslenir). Yalnızca `train.input_mode_probs` ile sessiz batch'ler de görmüş bir model için anlamlıdır; yoksa çıktı bozuk olur. Sessiz videolar için `tr-vsr-model` kullanın |
 
 Video ne olmalı:
 
@@ -95,7 +107,9 @@ Video ne olmalı:
   model yükleme. GPU'suz (`--cpu`) aynı video ~1 dakika.
 - Model meclis konuşmalarıyla eğitildi: resmi, hitabet tarzı konuşmada en
   iyi sonucu verir. Günlük konuşma, farklı ışık ve kamera açılarında hata artar.
-- Ses dosyası gerekmez; varsa kullanılmaz.
+- Dudak okuma modeli (`tr-vsr-model`) ses kullanmaz. Görüntü+ses modeli
+  videonun kendi ses akışını kullanır (16 kHz mono'ya çevrilir, görüntüyle
+  aynı zaman çizgisinde); ayrı ses dosyası verilmez.
 
 ## 4. Python içinden
 
@@ -111,13 +125,23 @@ for start, end, text in transcribe(module, crops, chunk_frames=250):
     print(f"{start:.1f}-{end:.1f}s  {text}")
 ```
 
+Görüntü+ses modeli sesi de ister:
+
+```python
+from avsr.inference import sound_track
+
+audio = sound_track("konusma.mp4")                   # float32 [S], 16 kHz
+for start, end, text in transcribe(module, crops, chunk_frames=250, audio=audio):
+    print(f"{start:.1f}-{end:.1f}s  {text}")
+```
+
 Ağız zaten kırpılmışsa (dataset klipleri gibi 96x96, 25 fps), yüz bulma
 atlanır:
 
 ```python
 from avsr.preprocess.video_io import read_video
 crops = read_video("dataset/tr-lrs-v3/2025-2026-birlesim-3/00077.mp4")
-print(transcribe(module, crops)[0][2])
+print(transcribe(module, crops)[0][2])     # görüntü+ses: audio=sound_track(<aynı klip>)
 ```
 
 ## 5. Test setinde yeniden ölçmek
@@ -126,9 +150,10 @@ Dataset (`dataset/tr-lrs-v3`, manifest'ler, tokenizer) proje klasöründeyse:
 
 ```bash
 python training/evaluate.py --run /tam/yol/tr-vsr-model
+python training/evaluate.py --run /tam/yol/tr-avsr-model decode.snr_target=0   # 0 dB babble gürültüsüyle
 ```
 
-Sonuç `tr-vsr-model/eval/test_video.json` ve `.tsv` dosyalarına yazılır.
+Sonuç modelin `eval/test_<girdi>.json` ve `.tsv` dosyalarına yazılır.
 `--split val` doğrulama setini ölçer.
 
 ## 6. Sonuçları okumak
@@ -149,6 +174,7 @@ Sonuç `tr-vsr-model/eval/test_video.json` ve `.tsv` dosyalarına yazılır.
 | `MediaPipe model not found` | `assets/face_landmarker.task` proje klasöründe olmalı (`cp -r tr-vsr-model/assets .`) |
 | `ModuleNotFoundError: cv2` / `mediapipe` | `pip install mediapipe opencv-python-headless` |
 | `no face found` | Videoda yüz bulunamadı: çok küçük, çok yan ya da kapalı |
+| `no audio stream` | Görüntü+ses modeline sessiz video verildi; `tr-vsr-model` kullanın |
 | `a face was found in only 40% of the frames` | Yüz çoğu karede yok; çıktı güvenilmez |
 | Çıktı hep aynı ya da boş | `--save-crop` ile kırpıntıya bakın: ağız ortada ve görünür mü |
 | CPU'da yavaş | Beam search CPU'da ağırdır; `--beam-size 10` ya da GPU |

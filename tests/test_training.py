@@ -338,3 +338,90 @@ def test_exported_model_transcribes(toy_cfg, monkeypatch, tmp_path):
     # 60 frames in pieces of 25: the last 10 frames are too short to decode.
     assert [(start, end) for start, end, _ in pieces] == [(0.0, 1.0), (1.0, 2.0)]
     assert all(isinstance(text, str) for _, _, text in pieces)
+
+
+def test_exported_audiovisual_model_transcribes_with_sound(toy_cfg, monkeypatch, tmp_path, toy_data):
+    import export_model as export_script
+
+    from avsr.inference import load_trained, sound_track, transcribe
+    from avsr.models.e2e import AVSRModel
+    from avsr.preprocess import video_io
+
+    # Trained from two checkpoints that are gone when the model is used.
+    paths = []
+    for kind in ("video", "audio"):
+        state = {}
+        for name, value in AVSRModel(62, toy_cfg(f"model.modality={kind}").model).state_dict().items():
+            name = name.replace(f"streams.{kind}.frontend.", "frontend.").replace(f"streams.{kind}.proj.", "proj_encoder.")
+            state[name.replace(f"streams.{kind}.encoder.", "encoder.")] = value
+        paths.append(str(tmp_path / f"{kind}.pth"))
+        torch.save(state, paths[-1])
+    cfg = toy_cfg("model.modality=audiovisual", f"model.pretrained.path={paths[0]}",
+                  f"model.pretrained.audio_path={paths[1]}", "train.max_epochs=1", "decode.beam_size=3",
+                  "exp_name=avexport")
+    _run(cfg)
+    for path in paths:
+        os.remove(path)
+    out = str(tmp_path / "avmodel")
+    monkeypatch.setattr(sys, "argv", ["export_model.py", "--run", os.path.join(cfg.exp_dir, "avexport"),
+                                      "--average", "1", "--out", out])
+    export_script.main()
+
+    module, _, _ = load_trained(out)
+    module.eval()
+    clip = os.path.join(toy_data["processed"], "s1", "00000.mp4")
+    crops, audio = video_io.read_video(clip), sound_track(clip)
+    assert abs(len(audio) - len(crops) * 640) <= 1024  # one AAC frame of padding
+    pieces = transcribe(module, crops, chunk_frames=25, audio=audio)
+    assert pieces and all(isinstance(text, str) for _, _, text in pieces)
+    assert pieces[0][:2] == (0.0, 1.0)
+    with pytest.raises(ValueError, match="needs the audio"):
+        transcribe(module, crops, chunk_frames=25)
+    # Lips alone: the audio stream is fed zeros.
+    assert transcribe(module, crops, chunk_frames=25, mode="video")
+
+
+def test_interrupted_run_resumes_in_the_middle_of_the_epoch(toy_cfg, monkeypatch):
+    """A server that dies mid-epoch: the timed last.ckpt continues with the untrained batches."""
+    from pytorch_lightning.callbacks import Callback
+
+    class Record(Callback):
+        def __init__(self, die_at=None):
+            self.batches, self.die_at = [], die_at
+
+        def on_train_batch_start(self, trainer, module, batch, batch_idx):
+            self.batches.append((trainer.global_step, tuple(batch["utt_ids"])))
+
+        def on_train_batch_end(self, trainer, module, outputs, batch, batch_idx):
+            if self.die_at is not None and trainer.global_step >= self.die_at:
+                raise SystemExit("server gone")
+
+    recorders = []
+    build = train_script.build_trainer
+
+    def build_with_recorder(cfg, run_dir, enable_progress_bar=True):
+        trainer = build(cfg, run_dir, enable_progress_bar)
+        trainer.callbacks.insert(0, recorders[-1])
+        return trainer
+
+    monkeypatch.setattr(train_script, "build_trainer", build_with_recorder)
+    overrides = ["model.modality=video", "train.max_epochs=2", "train.warmup_epochs=1", "data.max_frames_per_batch=120",
+                 "data.max_frames_per_clip=100", "train.checkpoint_every_minutes=0.000001"]
+    recorders.append(Record())
+    full = _run(toy_cfg(*overrides, "exp_name=uninterrupted"))
+    per_epoch = full["steps"] // 2
+    die_at = per_epoch + 3  # inside the second epoch
+
+    cfg = toy_cfg(*overrides, "exp_name=interrupted")
+    recorders.append(Record(die_at))
+    with pytest.raises(BaseException):
+        _run(cfg)
+    last = os.path.join(cfg.exp_dir, "interrupted", "checkpoints", "last.ckpt")
+    saved_step = torch.load(last, weights_only=False)["global_step"]
+    assert per_epoch < saved_step <= die_at  # written in the middle of the epoch
+
+    recorders.append(Record())
+    resumed = _run(cfg, resume=last)
+    assert resumed["steps"] == full["steps"]
+    # The rest of the epoch, batch for batch, as in the run that was not interrupted.
+    assert recorders[2].batches == [b for b in recorders[0].batches if b[0] >= saved_step]

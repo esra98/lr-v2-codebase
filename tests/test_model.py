@@ -1,11 +1,13 @@
+import os
+
 import pytest
 import torch
 
-from avsr.config import load_config, load_run_config
+from avsr.config import PROJECT_ROOT, load_config, load_run_config
 from avsr.decoding.beam import beam_decode, build_beam_search
 from avsr.models.e2e import AVSRModel
 from avsr.models.encoder import Encoder
-from avsr.models.pretrained import load_pretrained
+from avsr.models.pretrained import initialise, load_pretrained
 from avsr.training.schedule import EMA, WarmupCosine, average_checkpoints
 from avsr.utils.metrics import ErrorRate, edit_distance
 
@@ -193,13 +195,13 @@ def test_model_can_memorise_a_batch(toy_cfg):
 # ----------------------------------------------------------------- pretrained
 
 
-def _auto_avsr_style_checkpoint(model, path):
-    """Save a video model's weights under Auto-AVSR parameter names."""
+def _auto_avsr_style_checkpoint(model, path, kind="video"):
+    """Save a single-modality model's weights under Auto-AVSR parameter names."""
     state = {}
     for name, value in model.state_dict().items():
-        name = name.replace("streams.video.frontend.", "frontend.")
-        name = name.replace("streams.video.proj.", "proj_encoder.")
-        name = name.replace("streams.video.encoder.", "encoder.")
+        name = name.replace(f"streams.{kind}.frontend.", "frontend.")
+        name = name.replace(f"streams.{kind}.proj.", "proj_encoder.")
+        name = name.replace(f"streams.{kind}.encoder.", "encoder.")
         state[name] = value.clone()
     torch.save(state, path)
 
@@ -244,6 +246,67 @@ def test_load_pretrained_into_audiovisual_and_shared_models(toy_cfg, tmp_path):
         shared.state_dict()["shared_encoder.encoders.0.self_attn.linear_q.weight"],
         source.state_dict()["streams.video.encoder.encoders.0.self_attn.linear_q.weight"],
     )
+
+
+def _two_checkpoints(toy_cfg, tmp_path):
+    """A video and an audio model, saved as Auto-AVSR checkpoints."""
+    video = build(toy_cfg, "model.modality=video")
+    torch.manual_seed(5)
+    audio = AVSRModel(ODIM, toy_cfg("model.modality=audio").model)
+    paths = str(tmp_path / "vsr.pth"), str(tmp_path / "asr.pth")
+    _auto_avsr_style_checkpoint(video, paths[0], "video")
+    _auto_avsr_style_checkpoint(audio, paths[1], "audio")
+    return video.state_dict(), audio.state_dict(), paths
+
+
+def test_audiovisual_model_takes_each_stream_from_its_own_checkpoint(toy_cfg, tmp_path):
+    video, audio, (vsr, asr) = _two_checkpoints(toy_cfg, tmp_path)
+    cfg = toy_cfg("model.modality=audiovisual", "model.fusion.type=late_mlp", f"model.pretrained.path={vsr}",
+                  f"model.pretrained.audio_path={asr}", "model.pretrained.scope=full")
+    torch.manual_seed(1)
+    model = AVSRModel(ODIM, cfg.model)
+    before = {k: v.clone() for k, v in model.state_dict().items()}
+    assert initialise(model, cfg.model) > 0
+    after = model.state_dict()
+    assert torch.equal(after["streams.video.encoder.encoders.0.self_attn.linear_q.weight"],
+                       video["streams.video.encoder.encoders.0.self_attn.linear_q.weight"])
+    assert torch.equal(after["streams.audio.encoder.encoders.0.self_attn.linear_q.weight"],
+                       audio["streams.audio.encoder.encoders.0.self_attn.linear_q.weight"])
+    assert torch.equal(after["streams.audio.frontend.trunk.conv1.weight"], audio["streams.audio.frontend.trunk.conv1.weight"])
+    # The decoder comes from the video checkpoint, the fusion layer from nowhere.
+    assert torch.equal(after["decoder.decoders.0.self_attn.linear_q.weight"],
+                       video["decoder.decoders.0.self_attn.linear_q.weight"])
+    assert torch.equal(after["fusion.0.weight"], before["fusion.0.weight"])
+    names = model.pretrained_names
+    assert "streams.video.proj.weight" in names and "streams.audio.proj.weight" in names
+    assert not any(n.startswith("fusion.") for n in names) and "ctc.ctc_lo.weight" not in names
+
+
+def test_shared_conformer_comes_from_the_video_checkpoint(toy_cfg, tmp_path):
+    video, audio, (vsr, asr) = _two_checkpoints(toy_cfg, tmp_path)
+    cfg = toy_cfg("model.modality=audiovisual", "model.fusion.type=early_shared", f"model.pretrained.path={vsr}",
+                  f"model.pretrained.audio_path={asr}")
+    model = AVSRModel(ODIM, cfg.model)
+    initialise(model, cfg.model)
+    after = model.state_dict()
+    assert torch.equal(after["shared_encoder.encoders.0.self_attn.linear_q.weight"],
+                       video["streams.video.encoder.encoders.0.self_attn.linear_q.weight"])
+    assert torch.equal(after["streams.audio.proj.weight"], audio["streams.audio.proj.weight"])
+
+
+def test_finetune_configurations_load():
+    folder = os.path.join(PROJECT_ROOT, "training", "configs", "finetune")
+    modalities = {}
+    for name in ("vsr_base", "asr_base", "avsr_base"):
+        cfg = load_config([os.path.join(folder, f"{name}.yaml")])
+        modalities[name] = cfg.model.modality
+    assert modalities == {"vsr_base": "video", "asr_base": "audio", "avsr_base": "audiovisual"}
+    av = load_config([os.path.join(folder, "avsr_base.yaml")]).model
+    vsr = load_config([os.path.join(folder, "vsr_base.yaml")]).model
+    assert av.pretrained.path == vsr.pretrained.path and av.pretrained.audio_path
+    # Same recipe as the video model, so the two runs can be compared.
+    for key in ("adim", "elayers", "dlayers", "ctc_weight", "mask_conv_padding"):
+        assert av[key] == vsr[key], key
 
 
 def test_load_pretrained_reports_a_size_mismatch(toy_cfg, tmp_path):
@@ -354,6 +417,7 @@ def test_error_rates():
         ["data.max_frames_per_batch=200"],
         ["train.pretrained_lr_scale=0"],
         ["train.hold_pretrained_epochs=80"],
+        ["model.modality=video", "model.pretrained.audio_path=asr.pth"],
     ],
 )
 def test_config_rejects_bad_values(overrides):

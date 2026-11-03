@@ -4,6 +4,10 @@
 Usage:
     python training/transcribe.py --run exp/my_run video.mp4 [video2.mp4 ...]
 
+An audio-visual model also listens to the sound track of the video; with
+--mode video it reads the lips alone, which only works well for a model that
+was trained on video-only batches too (train.input_mode_probs).
+
 The video may be any size and frame rate; it should show one speaker facing
 the camera (the tallest face of every frame is taken as the speaker). Long
 videos are decoded in pieces of --chunk-seconds, so a word that falls on a
@@ -15,6 +19,7 @@ Needs MediaPipe and OpenCV besides the training requirements
 Examples:
     python training/transcribe.py --run exp/vsr_finetune --average 10 konusma.mp4
     python training/transcribe.py --run exp/vsr_finetune clip.mp4 --save-crop crop.mp4
+    python training/transcribe.py --run exp/avsr_finetune konusma.mp4
 """
 
 import argparse
@@ -26,7 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch  # noqa: E402
 
-from avsr.inference import load_trained, mouth_crops, transcribe  # noqa: E402
+from avsr.inference import load_trained, mouth_crops, sound_track, transcribe  # noqa: E402
 from avsr.preprocess import video_io  # noqa: E402
 
 
@@ -38,6 +43,9 @@ def main():
     parser.add_argument("--beam-size", type=int, default=None, help="Default: decode.beam_size of the run")
     parser.add_argument("--save-crop", help="Write the mouth crop of the (first) video here, to check it")
     parser.add_argument("--cpu", action="store_true", help="Decode on the CPU even when a GPU is present")
+    parser.add_argument(
+        "--mode", choices=["video", "audio", "audiovisual"], help="Inputs to use; default: those the model was trained on"
+    )
     parser.add_argument("videos", nargs="+")
     args = parser.parse_args()
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
@@ -47,14 +55,29 @@ def main():
     module.to(device).eval()
     print(f"# {len(checkpoints)} checkpoint(s) of {args.run}, decoding on {device}", file=sys.stderr)
 
+    cfg = module.cfg
+    mode = args.mode or cfg.decode.input_mode or cfg.model.modality
+    if mode not in module.model.supported_input_modes():
+        sys.exit(f"A {cfg.model.modality} model cannot run in {mode!r} mode")
     chunk_frames = max(12, int(round(args.chunk_seconds * video_io.VIDEO_FPS)))
     for i, path in enumerate(args.videos):
-        crops, detection_rate = mouth_crops(path)
-        if detection_rate < 0.8:
-            print(f"# {path}: a face was found in only {detection_rate:.0%} of the frames", file=sys.stderr)
-        if args.save_crop and i == 0:
-            video_io.write_video(args.save_crop, crops)
-        pieces = transcribe(module, crops, chunk_frames, args.beam_size)
+        crops = audio = None
+        if mode in ("video", "audiovisual"):
+            crops, detection_rate = mouth_crops(path)
+            if detection_rate < 0.8:
+                print(f"# {path}: a face was found in only {detection_rate:.0%} of the frames", file=sys.stderr)
+            if args.save_crop and i == 0:
+                video_io.write_video(args.save_crop, crops)
+        if mode in ("audio", "audiovisual"):
+            try:
+                audio = sound_track(path)
+            except ValueError as e:
+                hint = (
+                    "; a silent video needs a lip-reading model, or --mode video if this model "
+                    "was also trained on video alone" if mode == "audiovisual" else ""
+                )
+                sys.exit(f"{e}{hint}")
+        pieces = transcribe(module, crops, chunk_frames, args.beam_size, audio=audio, mode=mode)
         if len(pieces) == 1:
             print(f"{path}\t{pieces[0][2]}")
         else:

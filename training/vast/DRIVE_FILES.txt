@@ -8,3 +8,7 @@
 1VFzwmBCiNUcHOTag0h4LMo1due8beG-D  wheelhouse-py312-cu129.tar.part-02
 1b--7Hs5Oi8cPh1hpj2F5ehzjjjx9Ymqb  wheelhouse-py312-cu129.tar.part-03
 1_u2b3SYTsp5PjX9oRBi0PidNM2TCpZsG  wheelhouse-py312-cu129.tar.part-04
+# Ses+görüntü modu için ses ağırlıkları (setup.sh 5. adım). Bu ID Auto-AVSR'ın
+# kendi herkese açık linki (github.com/mpc001/auto_avsr, model zoo); dosya kendi
+# Drive klasörüne kopyalanırsa buraya o kopyanın ID'si yazılabilir.
+1YN9lwZN6iWn2qNQRpfpGpnf2r6ZTQqVT  asr_trlrs3vox2_base.pth

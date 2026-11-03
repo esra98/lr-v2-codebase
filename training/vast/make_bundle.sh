@@ -19,7 +19,7 @@ fi
 
 STAGE=$BUILD/lr-v2-vast
 rm -rf "$STAGE" && mkdir -p "$STAGE/bin"
-cp training/vast/{setup.sh,check.sh,train.sh,finish.sh,drive.env,DRIVE_FILES.txt,SHA256SUMS.drive,requirements-lock.txt} "$STAGE/"
+cp training/vast/{setup.sh,check.sh,train.sh,finish.sh,backup.sh,restore.sh,drive_backup.sh,drive.env,DRIVE_FILES.txt,SHA256SUMS.drive,requirements-lock.txt} "$STAGE/"
 cp training/vast/README.md "$STAGE/KURULUM.md"
 cp training/vast/MODEL_KULLANIMI.md training/vast/REMOTE_RUN.md "$STAGE/"
 cp "$BUILD/bin/python-3.12.tar.gz" "$STAGE/bin/" && cp -r "$BUILD/bin/gdown-wheels" "$STAGE/bin/"

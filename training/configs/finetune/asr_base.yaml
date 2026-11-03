@@ -68,3 +68,6 @@ train:
   accumulate_grad_batches: 1
   precision: 16-mixed
   save_top_k: 10
+  # last.ckpt also every 20 minutes, so that an interrupted server loses
+  # little (training/vast/backup.sh copies it to the local machine).
+  checkpoint_every_minutes: 20

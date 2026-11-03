@@ -577,3 +577,11 @@ def test_read_manifest_rejects_wrong_columns(tmp_path):
     path.write_text("utt_id\ttext\nx\ty\n", encoding="utf-8")
     with pytest.raises(ValueError):
         read_manifest(str(path))
+
+
+def test_bucket_sampler_skips_the_batches_trained_before_a_resume():
+    lengths = [10 + i % 30 for i in range(200)]
+    whole = BucketBatchSampler(lengths, max_frames=120, seed=3, epoch=2)
+    resumed = BucketBatchSampler(lengths, max_frames=120, seed=3, epoch=2, skip=4)
+    assert list(resumed) == list(whole)[4:]
+    assert len(resumed) == len(whole)  # the trainer counts the skipped batches as done

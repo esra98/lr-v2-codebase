@@ -13,7 +13,7 @@ from avsr.data.dataset import AVDataset, BucketBatchSampler, collate, split_batc
 from avsr.data.transforms import AudioTransform, VideoTransform
 from avsr.decoding.beam import beam_decode, build_beam_search
 from avsr.models.e2e import INPUT_MODES, AVSRModel, count_parameters
-from avsr.models.pretrained import load_pretrained
+from avsr.models.pretrained import initialise
 from avsr.text.tokenizer import build_tokenizer
 from avsr.training.schedule import EMA, WarmupCosine
 from avsr.utils.metrics import ErrorRate
@@ -87,6 +87,7 @@ class AVSRDataModule(LightningDataModule):
             shuffle=train,
             seed=cfg.seed,
             epoch=epoch,
+            skip=self._done_in_epoch() if train else 0,
         )
         return torch.utils.data.DataLoader(
             dataset,
@@ -95,6 +96,18 @@ class AVSRDataModule(LightningDataModule):
             num_workers=cfg.data.num_workers,
             pin_memory=cfg.data.pin_memory and torch.cuda.is_available(),
         )
+
+    def _done_in_epoch(self):
+        """Batches of the current epoch trained before the run was resumed from
+        a checkpoint saved in the middle of the epoch (train.checkpoint_every_minutes).
+
+        Lightning restores its batch counter but not the position of the
+        loader, which would otherwise start the epoch again from its first batch.
+        """
+        if self.trainer is None:
+            return 0
+        loop = self.trainer.fit_loop.epoch_loop
+        return loop.batch_progress.current.ready if loop.restarting else 0
 
     def train_dataloader(self):
         return self._loader("train")
@@ -115,9 +128,7 @@ class AVSRModule(LightningModule):
         self.save_hyperparameters({"cfg": OmegaConf.to_container(cfg, resolve=True)})
         self.tokenizer = build_tokenizer(cfg.tokenizer)
         self.model = AVSRModel(self.tokenizer.vocab_size, cfg.model)
-        if cfg.model.pretrained.path:
-            kind = "audio" if cfg.model.modality == "audio" else "video"
-            load_pretrained(self.model, resolve_path(cfg.model.pretrained.path), kind, cfg.model.pretrained.scope)
+        initialise(self.model, cfg.model)
         self.model.freeze(cfg.model.freeze)
         self.ema = EMA(self.model, cfg.train.ema_decay) if cfg.train.ema_decay > 0 else None
         self.val_metrics = {}

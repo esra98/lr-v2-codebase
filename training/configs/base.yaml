@@ -90,7 +90,13 @@ model:
     type: late_mlp        # late_mlp | early_shared
     hidden: 2048
   pretrained:
+    # Checkpoint of the model's modality; for an audio-visual model, the
+    # checkpoint of its video stream.
     path: ""
+    # Audio-visual models only: checkpoint of the audio stream (front-end,
+    # projection and, unless the Conformer is shared, the Conformer). The
+    # decoder comes from path when both are given.
+    audio_path: ""
     # frontend: visual/audio front-end only; encoder: front-end and Conformer;
     # full: everything whose shape matches.
     scope: encoder
@@ -121,6 +127,11 @@ train:
   val_check_interval: 1.0
   log_every_n_steps: 10
   save_top_k: 10
+  # Also write checkpoints/last.ckpt every this many minutes of training, not
+  # only at the end of an epoch (0 = only then). A run on an interruptible
+  # server then loses at most this much work; resuming continues in the
+  # middle of the epoch with the batches that were not yet trained on.
+  checkpoint_every_minutes: 0
   # Skip a batch that runs out of GPU memory instead of stopping the run.
   # This is for the occasional oversized batch: the run stops with an
   # explanation when more batches than this are skipped in a row, or more

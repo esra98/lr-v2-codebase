@@ -9,6 +9,8 @@ import logging
 
 import torch
 
+from avsr.config import resolve_path
+
 log = logging.getLogger(__name__)
 
 SCOPES = ("frontend", "encoder", "full")
@@ -44,13 +46,16 @@ def _rename(key, kind, shared_encoder):
     return None
 
 
-def load_pretrained(model, path, kind, scope="encoder"):
+def load_pretrained(model, path, kind, scope="encoder", conformer=True):
     """Copy matching weights from an Auto-AVSR checkpoint into ``model``.
 
     Args:
         kind: "video" or "audio", the modality of the checkpoint.
         scope: "frontend", "encoder" (front-end, projection and Conformer) or
             "full" (also the decoder, except vocabulary-dependent layers).
+        conformer: False leaves the checkpoint's Conformer out, for the
+            shared Conformer of an early_shared model that another
+            checkpoint fills.
 
     Returns:
         (number of tensors loaded, list of skipped names with reasons)
@@ -73,6 +78,8 @@ def load_pretrained(model, path, kind, scope="encoder"):
             continue
         if scope == "encoder" and not (is_frontend or is_encoder):
             continue
+        if not conformer and key.startswith("encoder."):
+            continue
         name = _rename(key, kind, shared)
         if name is None or name not in target:
             skipped.append((key, "no matching parameter"))
@@ -90,3 +97,34 @@ def load_pretrained(model, path, kind, scope="encoder"):
     model.pretrained_names = set(getattr(model, "pretrained_names", set())) | set(loaded)
     log.info("Loaded %d tensors from %s (%d skipped)", len(loaded), path, len(skipped))
     return len(loaded), skipped
+
+
+def initialise(model, cfg):
+    """Load the checkpoints named in ``cfg.pretrained`` (the model section).
+
+    A single-modality model takes ``path``. An audio-visual model takes the
+    video stream from ``path`` and the audio stream from ``audio_path``
+    (Auto-AVSR publishes no audio-visual checkpoint, but one for each
+    modality). With both given, the decoder and an early_shared Conformer
+    come from the video checkpoint; the fusion layer always starts from
+    random values.
+
+    Returns the number of tensors loaded.
+    """
+    pre = cfg.pretrained
+    if model.modality != "audiovisual":
+        if not pre.path:
+            return 0
+        return load_pretrained(model, resolve_path(pre.path), model.modality, pre.scope)[0]
+    loaded = 0
+    if pre.path:
+        loaded += load_pretrained(model, resolve_path(pre.path), "video", pre.scope)[0]
+    if pre.audio_path:
+        scope = pre.scope
+        if pre.path and scope == "full":
+            scope = "encoder"
+        shared = model.shared_encoder is not None
+        loaded += load_pretrained(
+            model, resolve_path(pre.audio_path), "audio", scope, conformer=not (shared and pre.path)
+        )[0]
+    return loaded

@@ -54,6 +54,11 @@ def validate(cfg):
     """Check option combinations that would otherwise fail deep inside a run."""
     if cfg.model.modality not in ("video", "audio", "audiovisual"):
         raise ValueError(f"model.modality: unknown value {cfg.model.modality!r}")
+    if cfg.model.pretrained.audio_path and cfg.model.modality != "audiovisual":
+        raise ValueError(
+            "model.pretrained.audio_path is only for audio-visual models; "
+            "an audio model takes its checkpoint from model.pretrained.path"
+        )
     if cfg.model.freeze not in ("none", "frontend", "encoder"):
         raise ValueError(f"model.freeze: unknown value {cfg.model.freeze!r}")
     if cfg.model.freeze == "encoder" and (list(cfg.model.interctc.layers) and cfg.model.interctc.self_condition):
@@ -95,6 +100,8 @@ def validate(cfg):
             "data.ptm_in_clips is true, so the clips already contain Partition-Time Masking; "
             "augment.video.ptm.enabled must be false, or every clip would be masked twice"
         )
+    if cfg.train.checkpoint_every_minutes < 0:
+        raise ValueError("train.checkpoint_every_minutes must be 0 (off) or a positive number of minutes")
     if cfg.augment.video.crop_size < 0:
         raise ValueError("augment.video.crop_size must be 0 (no crop) or a positive size")
 

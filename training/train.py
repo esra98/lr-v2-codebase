@@ -16,6 +16,7 @@ import logging
 import os
 import sys
 import time
+from datetime import timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -63,6 +64,18 @@ def build_trainer(cfg, run_dir, enable_progress_bar=True):
         ),
         LearningRateMonitor(logging_interval="step"),
     ]
+    if train.checkpoint_every_minutes > 0:
+        # The same file, also written in the middle of an epoch.
+        callbacks.append(
+            ModelCheckpoint(
+                dirpath=checkpoint_dir,
+                filename="last",
+                monitor=None,
+                save_top_k=1,
+                enable_version_counter=False,
+                train_time_interval=timedelta(minutes=train.checkpoint_every_minutes),
+            )
+        )
     gpu = torch.cuda.is_available() and train.accelerator in ("auto", "gpu")
     return Trainer(
         default_root_dir=run_dir,

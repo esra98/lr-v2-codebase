@@ -309,8 +309,15 @@ was skipped, and says which setting to lower.
 |---|---|
 | Speech recognition from audio | `-c training/configs/finetune/asr_base.yaml` (needs `pretrained/asr_trlrs3vox2_base.pth`) |
 | Smaller models from scratch | `-c training/configs/model/small.yaml model.modality=video` |
-| Audio-visual, as in Auto-AVSR | `model.modality=audiovisual model.fusion.type=late_mlp` |
+| Audio-visual, as in Auto-AVSR | `-c training/configs/finetune/avsr_base.yaml` (needs both `pretrained/vsr_trlrs2lrs3vox2avsp_base.pth` and `pretrained/asr_trlrs3vox2_base.pth`; `MODE=audiovisual` in `training/vast/`) |
 | One model for all three inputs | `model.modality=audiovisual model.fusion.type=early_shared train.input_mode_probs=[0.4,0.2,0.4]` |
+
+Auto-AVSR publishes no audio-visual checkpoint. `avsr_base.yaml` starts the
+video stream and the decoder from the video checkpoint
+(`model.pretrained.path`, 762 tensors) and the audio stream from the audio
+checkpoint (`model.pretrained.audio_path`, 604 tensors); the fusion MLP and
+the vocabulary layers are new. The rest of the recipe is that of
+`vsr_base.yaml`, so the two runs compare.
 
 ## 9. Evaluate
 

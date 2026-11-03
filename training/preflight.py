@@ -152,6 +152,9 @@ def main():
     if cfg.model.pretrained.path:
         path = resolve_path(cfg.model.pretrained.path)
         report("pretrained weights exist", os.path.isfile(path), path)
+    if cfg.model.pretrained.audio_path:
+        path = resolve_path(cfg.model.pretrained.audio_path)
+        report("pretrained audio weights exist", os.path.isfile(path), path)
     if FAILED:
         sys.exit(f"\n{len(FAILED)} CHECK(S) FAILED; the trial run was not started.")
 
