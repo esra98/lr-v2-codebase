@@ -27,5 +27,3 @@ __pycache__/
 /work/
 /dataset/
 
-# Local webcam demo (kept on this machine only)
-live-demo/
