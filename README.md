@@ -17,6 +17,29 @@ An audio-visual model can also be *evaluated* on video only, audio only or
 both (`decode.input_mode`), which is how a single unified model serves all
 three tasks.
 
+## Dataset: TR-LRS v3
+
+225,977 Turkish sentence clips (224.6 hours, 39 recordings: TBMM general
+assembly sessions and YouTube), mouth crops 96x96 with 16 kHz audio and a
+transcript per clip; train / val / test 208,811 / 10,993 / 6,173.
+
+| | |
+|---|---|
+| Download | [tr-lrs-v3.tar.gz](https://drive.google.com/file/d/15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC/view) (12.9 GB, Google Drive) |
+| Drive folder | https://drive.google.com/drive/folders/16tybAQsivB4GPGB2piDDpuoSJeWToBCS |
+| sha256 | `143122937a84a16748a8b22b415d3d49b993c522f44a2b8842eb46d1dda55b8e` |
+
+```bash
+pip install gdown
+gdown 15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC -O dataset/tr-lrs-v3.tar.gz
+echo "143122937a84a16748a8b22b415d3d49b993c522f44a2b8842eb46d1dda55b8e  dataset/tr-lrs-v3.tar.gz" | sha256sum -c
+tar -xzf dataset/tr-lrs-v3.tar.gz -C .      # creates dataset/tr-lrs-v3/, manifests, tokenizer
+```
+
+Contents, format and checks: `DATASET.md`. How it was built:
+`docs/dataset_construction.md`; where the raw recordings came from:
+`docs/ham_videolar.md`. A 50-clip sample is in `dataset-creation/samples/`.
+
 ## Layout
 
 The project has three parts: the code that builds the dataset, the code that

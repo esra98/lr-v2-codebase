@@ -14,7 +14,7 @@ Its construction is kept in `docs/archive/` for the record only.
 |---|---|
 | Working copy | `dataset/tr-lrs-v3/` on the build machine (14 GB, 451,954 files) |
 | Local archive | `dataset/tr-lrs-v3.tar.gz` (12.9 GB) in this folder, with its `.sha256` (not in git) |
-| Drive archive | `tr-lrs-v3.tar.gz` (12.9 GB) in the Google Drive folder `16tybAQsivB4GPGB2piDDpuoSJeWToBCS`, with `tr-lrs-v3.tar.gz.sha256` beside it |
+| Drive archive | [`tr-lrs-v3.tar.gz`](https://drive.google.com/file/d/15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC/view) (12.9 GB, Drive ID `15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC`) in the [Google Drive folder](https://drive.google.com/drive/folders/16tybAQsivB4GPGB2piDDpuoSJeWToBCS) `16tybAQsivB4GPGB2piDDpuoSJeWToBCS`, with `tr-lrs-v3.tar.gz.sha256` beside it; `gdown 15dwNvrNDL_YJbRYSsC7T_Vnk2Ng25jwC` |
 | Format sample | `dataset-creation/samples/` in this repository: 50 clips with labels and their clip-table rows |
 
 ```
