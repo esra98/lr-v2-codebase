@@ -8,7 +8,7 @@ kullanılmaz.
 |---|---|
 | Model | Auto-AVSR mimarisi: 3D konvolüsyon + ResNet-18 ön uç, 12 Conformer bloğu, 6 Transformer decoder bloğu, 241M parametre |
 | Başlangıç | Ma ve ark. `vsr_trlrs2lrs3vox2avsp_base` (3.291 saat İngilizce) |
-| Fine-tune | TR-LRS v3: TBMM Genel Kurulu ve YouTube konuşmaları, 207,8 saat, 208.811 klip |
+| Fine-tune | TR-LRS v3: TBMM Genel Kurulu konuşmaları (TBMM TV / Meclis TV yayınları), 207,8 saat, 208.811 klip |
 | Çıktı | Büyük harfli Türkçe, noktalama yok, sayılar yazıyla (`1921` → `BİN DOKUZ YÜZ YİRMİ BİR`), İ/I ayrımı korunur |
 | Doğruluk | `eval/test_video.json`: eğitimde hiç görülmemiş iki oturumda (6.173 klip) kelime (WER) ve karakter (CER) hata oranı |
 

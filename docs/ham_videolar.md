@@ -5,10 +5,14 @@ TR-LRS v3, bu belgedeki 39 oturumun ham kayıtlarından üretildi (`videos/`, to
 Bu belge oturumların nereden geldiğini, nasıl indirildiğini ve yeniden indirilen bir dosyanın aynı olup olmadığının
 nasıl kontrol edileceğini kaydeder.
 
+**Kaynak:** 39 kaydın tamamı TBMM TV (Meclis TV) Genel Kurul yayınlarıdır. 20'si bu yayınların
+YouTube'daki yüklemelerinden indirildi. Bu yüzden dataset'e kaynak olarak TBMM TV gösterilmelidir; YouTube
+linkleri sadece dosyaların nereden indirildiğini kaydeder.
+
 Kaynak tablo `videos/sources.tsv` dosyasıdır; bir kopyası `docs/ham_videolar_sources.tsv` olarak burada duruyor. Bu dosya `python dataset-creation/corpus.py ingest` ile üretilir ve
 tablolar ondan kopyalanmıştır.
 
-## YouTube: 20 oturum, 172.6 saat, 82.2 GB
+## TBMM TV yayınları, YouTube'dan indirilen: 20 oturum, 172.6 saat, 82.2 GB
 
 Oturum adı `yt-<video id>` biçimindedir.
 
@@ -62,7 +66,7 @@ Bu listeyi yukarıdaki komuta `-a yt_links.txt` ile ver.
 `./yt-dlp_linux -a ./links.txt -f "best" -o "%(id)s.%(ext)s" --extractor-args "youtube:player_client=android" --download-archive downloaded.txt -N 8 --ignore-errors`.
 Bu komut 360p indirir, v3 için kullanılmadı.
 
-## TBMM: 19 oturum, 159.9 saat, 98.1 GB
+## TBMM TV yayınları, TBMM arşivinden: 19 oturum, 159.9 saat, 98.1 GB
 
 TBMM Genel Kurul kayıtları. Oturum adı `<yasama yılı>-birlesim-<birleşim no>` biçimindedir, örneğin
 `2024-2025-birlesim-72` = 2024-2025 yasama yılı, 72. birleşim. **İndirme linkleri hiçbir yerde kaydedilmemiş**

@@ -38,8 +38,8 @@ with start time, end time and confidence.
 
 | Property | Value |
 |---|---|
-| Content | plenary sessions of the Grand National Assembly of Türkiye |
-| Recordings | 39: 19 from the assembly's own archive (`<term>-birlesim-<n>`), 20 from the assembly's YouTube channel (`yt-<video id>`) |
+| Content | TBMM TV (Meclis TV) broadcasts of the plenary sessions of the Grand National Assembly of Türkiye |
+| Recordings | 39: 19 from the assembly's own archive (`<term>-birlesim-<n>`), 20 downloaded from YouTube uploads of the same TBMM TV broadcasts (`yt-<video id>`) |
 | Length | 332.4 hours; 4.4 to 11.6 hours per recording |
 | Video | 1920x1080, 30 frames per second, H.264 |
 | Audio | AAC, 44.1 kHz stereo (downloads) or as broadcast; converted to 16 kHz mono |
