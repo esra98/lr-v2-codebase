@@ -176,16 +176,6 @@ python training/transcribe.py --run tr-vsr-model konusma.mp4
 prints the text, one line per 10 seconds of video. Add
 `--save-crop crop.mp4` to see the mouth crop the model sees.
 
-### Live demo
-
-[`live-demo/`](live-demo) is a small desktop app: record yourself with the
-webcam, and see what the model reads from your lips next to what Whisper
-hears, with WER and CER.
-
-```bash
-python live-demo/dudak_okuma.py --run tr-vsr-model
-```
-
 ---
 
 ## 3. Training on a rented GPU (vast.ai)
@@ -248,7 +238,6 @@ which also pins the Python and library versions.
 ```
 dataset-creation/   corpus.py (the dataset pipeline), YouTube download script, 50 sample clips
 training/           train.py, evaluate.py, export_model.py, transcribe.py, preflight.py, ...
-live-demo/          webcam app: lip reading vs. Whisper, side by side
   configs/          base.yaml (every option), finetune/ (the recipes above), model/, data/, exp/
   vast/             rented-GPU scripts and their guides
 dataset/            the downloaded archive and the unpacked dataset (not in git)
